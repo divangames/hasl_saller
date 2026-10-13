@@ -1,4 +1,6 @@
-const A = "./assets/figma";
+const scriptUrl = document.currentScript?.src || new URL("./app.js", location.href).href;
+const publicUrl = (path) => new URL(String(path).replace(/^\.\//, ""), new URL(".", scriptUrl)).href;
+const A = publicUrl("assets/figma");
 const imageUrl = (article, file) => `https://outmaxshop.ru/components/com_jshopping/files/img_products/${article}/${file}`;
 const makeProduct = (section, name, article, price, oldPrice, image, options = {}) => ({
   id: String(article), section, name, article: String(article), price, oldPrice: oldPrice || price,
@@ -98,11 +100,68 @@ const toast = document.querySelector("#toast");
 const money = (value) => `${Math.round(value).toLocaleString("ru-RU")} ₽`;
 const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
 
+const sectionSlugs = { "Кроссовки": "sneakers", "Одежда": "clothes", "Аксессуары": "accessories" };
+const slugSections = Object.fromEntries(Object.entries(sectionSlugs).map(([section, slug]) => [slug, section]));
+const usesHashRouting = location.hostname === "127.0.0.1" || location.hostname === "localhost" || location.hostname.endsWith(".github.io") || location.protocol === "file:";
+
+function routePath(route = state.route) {
+  if (route === "home") return "/";
+  if (route === "catalog") return `/catalog/${sectionSlugs[state.section] || "sneakers"}`;
+  if (route === "product") return `/product/${state.selectedProduct?.article || state.selectedProduct?.id || ""}`;
+  if (route === "success") return "/checkout/success";
+  return `/${route}`;
+}
+
+function routeUrl(route = state.route) {
+  const path = routePath(route);
+  return usesHashRouting ? `#${path === "/" ? "home" : path.slice(1)}` : path;
+}
+
+function readLocation() {
+  const raw = usesHashRouting ? location.hash.slice(1) : location.pathname.replace(/^\/+|\/+$/g, "");
+  const parts = raw.split("/").filter(Boolean);
+  if (!parts.length || parts[0] === "home") return { route: "home" };
+  if (parts[0] === "catalog") return { route: "catalog", section: slugSections[parts[1]] || state.section };
+  if (parts[0] === "product") return { route: "product", productId: parts[1] };
+  if (parts[0] === "checkout" && parts[1] === "success") return { route: "success" };
+  if (["cart", "checkout", "terms", "success"].includes(parts[0])) return { route: parts[0] };
+  return { route: "home" };
+}
+
+function snapshotState(scrollY = window.scrollY) {
+  return {
+    route: state.route,
+    section: state.section,
+    filter: state.filter,
+    advancedFilters: JSON.parse(JSON.stringify(state.advancedFilters)),
+    visibleCount: state.visibleCount,
+    selectedProductId: state.selectedProduct?.id,
+    selectedSize: state.selectedSize,
+    galleryIndex: state.galleryIndex,
+    checkoutStep: state.checkoutStep,
+    scrollY,
+  };
+}
+
+function restoreSnapshot(snapshot) {
+  if (!snapshot) return;
+  state.route = snapshot.route || "home";
+  state.section = snapshot.section || state.section;
+  state.filter = snapshot.filter || "Все";
+  state.advancedFilters = snapshot.advancedFilters || state.advancedFilters;
+  state.visibleCount = snapshot.visibleCount || 18;
+  state.selectedProduct = products.find((item) => item.id === snapshot.selectedProductId) || state.selectedProduct;
+  state.selectedSize = snapshot.selectedSize ?? null;
+  state.galleryIndex = snapshot.galleryIndex || 0;
+  state.checkoutStep = snapshot.checkoutStep || 1;
+  state.filterOpen = false;
+}
+
 function restoreCart() { try { const rows = JSON.parse(localStorage.getItem("outmax_prototype_cart") || "[]"); state.cart = rows.map((row) => ({ ...row, product: products.find((item) => item.id === row.productId) })).filter((row) => row.product); } catch { state.cart = []; } }
 function saveCart() { localStorage.setItem("outmax_prototype_cart", JSON.stringify(state.cart.map((row) => ({ id: row.id, productId: row.product.id, size: row.size, quantity: row.quantity })))); }
 
 async function sendOrderToTelegram(order) {
-  const config = await fetch("./TG%20BOT.txt", { cache: "no-store" }).then((response) => { if (!response.ok) throw new Error("Telegram config not found"); return response.text(); });
+  const config = await fetch(publicUrl("TG%20BOT.txt"), { cache: "no-store" }).then((response) => { if (!response.ok) throw new Error("Telegram config not found"); return response.text(); });
   const token = config.match(/^\s*Token\s*:\s*(\S+)\s*$/im)?.[1];
   const chatId = config.match(/^\s*Id\s*:\s*(-?\d+)\s*$/im)?.[1];
   if (!token || !chatId) throw new Error("Telegram config is invalid");
@@ -143,22 +202,38 @@ function discountDashboard() {
 }
 
 function quickSectionsNav(extraClass = "") {
-  const buttons = Object.entries(sectionCounts).map(([section, count]) => `<button data-section="${section}" class="${state.route === "catalog" && state.section === section ? "active" : ""}"><span>${section}</span><b>${count}</b></button>`).join("");
-  return `<nav class="quick-sections ${extraClass}" aria-label="Быстрый переход по разделам">${buttons}</nav>`;
+  const buttons = Object.entries(sectionCounts).map(([section, count]) => {
+    const active = (state.route === "catalog" && state.section === section) || (state.route === "product" && state.selectedProduct?.section === section);
+    const iconClass = sectionSlugs[section];
+    const imageName = iconClass === "accessories" ? "other" : iconClass;
+    return `<button data-section="${section}" class="quick-tab ${active ? "active" : ""}" role="tab" aria-selected="${active}"><span class="quick-tab-image" aria-hidden="true"><img src="${publicUrl(`images/taps/${imageName}_02.png?v=20261013b`)}" alt="" /></span><span class="quick-tab-copy"><span>${section}</span><b>${count}</b></span></button>`;
+  }).join("");
+  return `<nav class="quick-sections ${extraClass}" role="tablist" aria-label="Категории товаров">${buttons}</nav>`;
+}
+
+const navigationItems = [["home", "Главная", "6d1ae.svg", "91142.svg"], ["sneakers", "Кроссовки", "0f792.svg", "f2bb2.svg"], ["cart", "Корзина", "8b8e1.svg", "c6294.svg"], ["clothes", "Одежда", "14327.svg", "14327.svg"], ["terms", "Условия", "e5bc1.svg", "ab7d3.svg"]];
+const desktopNavigationItems = [navigationItems[0], navigationItems[1], navigationItems[3], navigationItems[4], navigationItems[2]];
+function navigationButtons(items = navigationItems) {
+  return items.map(([key, label, activeIcon, icon]) => {
+    const active = key === state.route || (key === "sneakers" && state.route === "catalog" && state.section === "Кроссовки") || (key === "clothes" && state.route === "catalog" && state.section === "Одежда");
+    const action = key === "sneakers" ? 'data-section="Кроссовки"' : key === "clothes" ? 'data-section="Одежда"' : `data-route="${key}"`;
+    const glyph = key === "home" ? '<span class="home-menu-glyph" aria-hidden="true"></span>' : key === "sneakers" ? '<span class="sneaker-menu-glyph" aria-hidden="true"></span>' : key === "terms" ? '<span class="terms-menu-glyph" aria-hidden="true"></span>' : `<img src="${A}/${active ? activeIcon : icon}" alt="" />`;
+    const accessibleLabel = key === "cart" ? `aria-label="Корзина, товаров: ${cartCount()}"` : "";
+    return `<button ${action} ${key === "cart" ? "data-cart-target" : ""} ${accessibleLabel} class="${active ? "active" : ""}" ${active ? 'aria-current="page"' : ""}><span class="nav-icon">${glyph}${key === "cart" && cartCount() ? `<i>${cartCount()}</i>` : ""}</span><small>${label}</small></button>`;
+  }).join("");
 }
 
 function header() {
-  const discountHeader = state.route === "home" ? "" : `<div class="sticky-head"><div class="head-inner">${discountDashboard()}</div>${quickSectionsNav("head-inner")}</div>`;
-  return `${discountHeader}<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="На главную"><img src="./images/outmax_logo.svg" alt="Outmax" /></button><nav><button data-route="terms" class="${state.route === "terms" ? "active" : ""}">Условия акции</button></nav><button class="desktop-cart" data-route="cart" aria-label="Корзина"><img src="${A}/cdd81.svg" alt="" />Корзина${cartCount() ? `<em>${cartCount()}</em>` : ""}</button></header>`;
+  const discountHeader = ["home", "success"].includes(state.route) ? "" : `<div class="sticky-head"><div class="head-inner">${discountDashboard()}</div>${quickSectionsNav("head-inner")}</div>`;
+  return `${discountHeader}<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="На главную"><img src="${publicUrl("images/outmax_logo.svg")}" alt="Outmax" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopNavigationItems)}</nav></header>`;
 }
 
 function bottomNav() {
-  const items = [["home", "Главная", "6d1ae.svg", "91142.svg"], ["sneakers", "Кроссовки", "0f792.svg", "f2bb2.svg"], ["cart", "Корзина", "8b8e1.svg", "c6294.svg"], ["clothes", "Одежда", "14327.svg", "14327.svg"], ["terms", "Условия", "e5bc1.svg", "ab7d3.svg"]];
-  return `<nav class="bottom-nav" aria-label="Навигация">${items.map(([key, label, activeIcon, icon]) => { const active = key === state.route || (key === "sneakers" && state.route === "catalog" && state.section === "Кроссовки") || (key === "clothes" && state.route === "catalog" && state.section === "Одежда"); const action = key === "sneakers" ? 'data-section="Кроссовки"' : key === "clothes" ? 'data-section="Одежда"' : `data-route="${key}"`; const glyph = key === "home" ? '<span class="home-menu-glyph" aria-hidden="true"></span>' : key === "sneakers" ? '<span class="sneaker-menu-glyph" aria-hidden="true"></span>' : `<img src="${A}/${active ? activeIcon : icon}" alt="" />`; return `<button ${action} class="${active ? "active" : ""}"><span class="nav-icon">${glyph}${key === "cart" && cartCount() ? `<i>${cartCount()}</i>` : ""}</span><small>${label}</small></button>`; }).join("")}</nav>`;
+  return `<nav class="bottom-nav" aria-label="Навигация">${navigationButtons()}</nav>`;
 }
 
 function homeView() {
-  return `<div class="home-view"><button class="hero" data-route="terms"><img src="./images/banners/main_02.png" alt="Скидка до 50%" /><span class="hero-overlay"></span><span class="hero-copy"><b>Акция</b><strong>Скидка до 50%</strong><small>Чем выше сумма корзины — тем больше скидка.<br />Подробные условия внутри.</small></span></button><div class="home-filter-stack"><div class="home-filter-inner">${discountDashboard()}</div></div><section class="categories-section"><div class="section-title"><h2>Категории</h2><button data-route="terms">Условия акции</button></div><div class="category-grid"><button data-section="Кроссовки"><img src="./images/banners/sneakers_02.png" alt="Кроссовки" /><span><strong>Кроссовки</strong><small>2 000+</small></span></button><button data-section="Одежда"><img src="./images/banners/clothes_02.png" alt="Одежда" /><span><strong>Одежда</strong><small>1 000+</small></span></button><button data-section="Аксессуары"><img src="./images/banners/other_02.png" alt="Аксессуары" /><span><strong>Аксессуары</strong><small>500+</small></span></button></div></section></div>`;
+  return `<div class="home-view"><button class="hero" data-route="terms"><img src="${publicUrl("images/banners/main_02.png")}" alt="Скидка до 50%" /><span class="hero-overlay"></span><span class="hero-copy"><b>Акция</b><strong>Скидка до 50%</strong><small>Чем выше сумма корзины — тем больше скидка.<br />Подробные условия внутри.</small></span></button><div class="home-filter-stack"><div class="home-filter-inner">${discountDashboard()}</div></div><section class="categories-section"><div class="section-title"><h2>Категории</h2></div><div class="category-grid"><button data-section="Кроссовки"><img src="${publicUrl("images/banners/sneakers_02.png?v=f3f9c50b")}" alt="Кроссовки" /><span><strong>Кроссовки</strong><small>2 000+</small></span></button><button data-section="Одежда"><img src="${publicUrl("images/banners/clothes_02.png?v=20261013c")}" alt="Одежда" /><span><strong>Одежда</strong><small>1 000+</small></span></button><button data-section="Аксессуары"><img src="${publicUrl("images/banners/other_02.png?v=20261013c")}" alt="Аксессуары" /><span><strong>Аксессуары</strong><small>500+</small></span></button></div>${saleTermsNote()}</section></div>`;
 }
 
 function normalizedGender(gender) { return ({ "Детские": "Детский", "Женские": "Женский", "Мужские": "Мужской" })[gender] || gender; }
@@ -202,15 +277,21 @@ function activeFilterBar() {
   if (!entries.length) return "";
   return `<div class="active-filter-bar" aria-label="Выбранные фильтры"><div>${entries.map(({ group, value }) => `<button data-remove-filter="${group}" data-remove-value="${escapeHtml(String(value))}">${escapeHtml(String(value))}<span>×</span></button>`).join("")}</div><button id="clear-active-filters">Очистить</button></div>`;
 }
+
+function saleTermsNote() {
+  return `<aside class="sale-note" aria-label="Краткие условия акции"><span class="sale-note-icon" aria-hidden="true">%</span><div><strong>Условия акции</strong><p>Добавляйте товары в корзину — чем выше сумма заказа, тем больше скидка. Сумма рассчитывается по ценам до скидки, а скидка применяется автоматически. Доставка платная и оплачивается на сайте, товары — при получении. Заказ выкупается только целиком. Возврат — по согласованию с интернет-магазином.</p></div><button data-route="terms">Подробнее<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></button></aside>`;
+}
 function shortProductName(name) {
   if (name.length <= 24) return name;
   const words = name.split(/\s+/).slice(0, 3).join(" ");
   return `${words.length > 25 ? words.slice(0, 25).trimEnd() : words}…`;
 }
+const recentCardAdds = new Set();
+const addedCheck = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8" /></svg>';
 function productCard(product, compact = false) {
   const discount = product.oldPrice > product.price ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
-  const sizes = product.sizes.slice(0, 6).map((size) => `<span>${escapeHtml(String(size))}</span>`).join("");
-  return `<article class="product-card ${compact ? "compact" : ""}"><button class="product-open" data-product="${product.id}" aria-label="${escapeHtml(product.name)}"><span class="card-image"><img src="${product.image}" alt="${escapeHtml(product.name)}" loading="lazy" />${discount >= 45 ? `<i>−${discount}%</i>` : ""}</span><span class="card-info"><strong title="${escapeHtml(product.name)}">${escapeHtml(shortProductName(product.name))}</strong><small>Арт. ${product.article}</small><span class="card-sizes"><em>Размеры</em><span class="card-size-list">${sizes}</span></span><span class="card-price"><b>${money(product.price)}</b>${product.oldPrice > product.price ? `<del>${money(product.oldPrice)}</del>` : ""}</span></span></button>${compact ? "" : `<button class="card-cta" data-product="${product.id}">Выбрать размер</button>`}</article>`;
+  const sizes = product.sizes.map((size) => { const key = `${product.id}:${size}`; const added = recentCardAdds.has(key); return `<button type="button" class="card-size-button ${added ? "is-added" : ""}" data-card-product="${product.id}" data-card-size="${escapeHtml(String(size))}" aria-label="${added ? "Добавлено в корзину" : `Добавить размер ${escapeHtml(String(size))} в корзину`}" ${added ? "disabled" : ""}>${added ? addedCheck : escapeHtml(String(size))}</button>`; }).join("");
+  return `<article class="product-card ${compact ? "compact" : ""}"><button class="product-open" data-product="${product.id}" aria-label="Открыть ${escapeHtml(product.name)}"><span class="card-image"><img src="${product.image}" alt="${escapeHtml(product.name)}" loading="lazy" />${discount >= 45 ? `<i>−${discount}%</i>` : ""}</span><span class="card-info"><strong title="${escapeHtml(product.name)}">${escapeHtml(shortProductName(product.name))}</strong><small>Арт. ${product.article}</small></span></button><div class="card-buy"><span class="card-sizes"><em>Размеры</em><span class="card-size-list">${sizes}</span></span><span class="card-price"><b>${money(product.price)}</b>${product.oldPrice > product.price ? `<del>${money(product.oldPrice)}</del>` : ""}</span></div></article>`;
 }
 
 function catalogView() {
@@ -223,7 +304,7 @@ function catalogView() {
 const productDescription = `Товары представленные на сайте являются качественной репликой (категория ААА+) Реплика категорий ААА+ это высокое качество, и долгий срок службы Высокие ботинки – это универсальный выбор для городских прогулок и активного отдыха. Они подойдут для холодной и дождливой погоды Характеристики Высоких ботинок:— Классическая шнуровка удобная фиксация стопы и индивидуальная посадка для любого типа ноги— Верх из текстиля и прессованной кожи легкие и прочные материалы для долгого срока службы— Защита в носке и пяточной зоне предотвращает повреждения и сохраняет форму ботинка— Высокая резиновая подошва амортизация и поддержка на любых поверхностях, комфорт при долгой носке— Глубокий протектор надёжное сцепление с мокрой и скользкой дорогой, уверенность в каждом шаге С чем носить Высокие ботинки:— Горпкор: карго-брюки, утеплённые куртки, флисовые свитшоты— Кэжуал: джинсы, базовые толстовки, джинсовые или кожаные куртки классическая шнуровка; верх из текстиля и прессованной кожи; защита в носке и пяточной зоне; высокая резиновая подошва; глубокий протектор.`;
 function productView() {
   const p = state.selectedProduct; const gallery = p.gallery || [p.image]; const related = products.filter((item) => item.section === p.section && item.id !== p.id).slice(0, 4);
-  return `<div class="product-view content-width"><div class="product-layout"><section class="gallery-panel"><div class="gallery-main"><img src="${gallery[state.galleryIndex] || gallery[0]}" alt="${escapeHtml(p.name)}" /></div>${gallery.length > 1 ? `<div class="thumbs">${gallery.map((src, index) => `<button data-gallery="${index}" class="${index === state.galleryIndex ? "active" : ""}"><img src="${src}" alt="Фото ${index + 1}" /></button>`).join("")}</div>` : ""}</section><section class="product-details"><p class="product-brand">${escapeHtml(p.brand)}</p><h1>${escapeHtml(p.name)}</h1><p class="product-article">Артикул ${p.article}</p><div class="product-price"><strong>${money(p.price)}</strong>${p.oldPrice > p.price ? `<del>${money(p.oldPrice)}</del>` : ""}</div><h2>Размер (EU) <span>— выберите</span></h2><div class="sizes">${p.sizes.map((size) => `<button data-size="${size}" class="${String(state.selectedSize) === String(size) ? "active" : ""}">${size}</button>`).join("")}</div><button class="red-button add-button" data-add="${p.id}">В корзину</button><dl class="specs"><div><dt>Цвет</dt><dd>Камуфляж</dd></div><div><dt>Сезон</dt><dd>Демисезон</dd></div><div><dt>Категория</dt><dd>${p.section === "Кроссовки" ? "Ботинки" : p.section}</dd></div><div><dt>Модель</dt><dd>${escapeHtml(p.name.split(" ")[0])}</dd></div><div><dt>Бренд</dt><dd>${escapeHtml(p.brand === "SNEAKERS" ? "ONE" : p.brand)}</dd></div></dl><p class="long-description">${productDescription}</p></section></div><section class="related"><h2>Смотрите также</h2><div>${related.map((item) => productCard(item, true)).join("")}</div></section></div>`;
+  return `<div class="product-view content-width"><button class="product-back" id="product-back" aria-label="Назад"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6" /></svg></button><div class="product-layout"><section class="gallery-panel"><div class="gallery-main"><img src="${gallery[state.galleryIndex] || gallery[0]}" alt="${escapeHtml(p.name)}" /></div>${gallery.length > 1 ? `<div class="thumbs">${gallery.map((src, index) => `<button data-gallery="${index}" class="${index === state.galleryIndex ? "active" : ""}"><img src="${src}" alt="Фото ${index + 1}" /></button>`).join("")}</div>` : ""}</section><section class="product-details"><p class="product-brand">${escapeHtml(p.brand)}</p><h1>${escapeHtml(p.name)}</h1><p class="product-article">Артикул ${p.article}</p><div class="product-price"><strong>${money(p.price)}</strong>${p.oldPrice > p.price ? `<del>${money(p.oldPrice)}</del>` : ""}</div><h2>Размер (EU) <span>— выберите</span></h2><div class="sizes">${p.sizes.map((size) => `<button data-size="${size}" class="${String(state.selectedSize) === String(size) ? "active" : ""}">${size}</button>`).join("")}</div><button class="red-button add-button" data-add="${p.id}">В корзину</button><dl class="specs"><div><dt>Цвет</dt><dd>Камуфляж</dd></div><div><dt>Сезон</dt><dd>Демисезон</dd></div><div><dt>Категория</dt><dd>${p.section === "Кроссовки" ? "Ботинки" : p.section}</dd></div><div><dt>Модель</dt><dd>${escapeHtml(p.name.split(" ")[0])}</dd></div><div><dt>Бренд</dt><dd>${escapeHtml(p.brand === "SNEAKERS" ? "ONE" : p.brand)}</dd></div></dl><p class="long-description">${productDescription}</p></section></div><section class="related"><h2>Смотрите также</h2><div>${related.map((item) => productCard(item, true)).join("")}</div></section></div>`;
 }
 
 function cartView() {
@@ -242,18 +323,182 @@ function checkoutDeliveryStep() {
   return `<div class="delivery-step"><div class="customer-card"><p>${escapeHtml(c.name)}, ${escapeHtml(c.phone)}</p><p>${escapeHtml(c.city)}, индекс 101000</p></div><h2>Способ доставки</h2><div class="delivery-list">${deliveryOptions.map((item) => `<label class="delivery-option ${c.delivery === item.id ? "selected" : ""}"><input type="radio" name="delivery" value="${item.id}" ${c.delivery === item.id ? "checked" : ""} /><i></i><span>${item.title}</span></label>`).join("")}</div>${c.delivery === "pickup" ? `<div class="pickup-list"><h2>Пункт выдачи СДЭК</h2><input class="pickup-search" placeholder="Поиск по адресу" />${points.map(([id, title, note]) => `<label><input type="radio" name="pickup" value="${id}" ${c.pickup === id ? "checked" : ""} /><span><b>${title}</b><small>${note} · ${id}</small></span></label>`).join("")}</div>` : ""}<div class="checkout-actions"><button class="outline-button" id="checkout-back">Назад</button><button class="red-button" id="checkout-submit">Отправить заявку</button></div></div>`;
 }
 function checkoutView() { if (!state.cart.length) return `<div class="checkout-view content-width"><div class="empty-card"><h1>Корзина пуста</h1><button class="red-button" data-section="Кроссовки">В каталог</button></div></div>`; return `<div class="checkout-view content-width"><h1>Оформление</h1><div class="checkout-tabs"><button class="${state.checkoutStep === 1 ? "active" : ""}" data-checkout-step="1">1. Данные</button><button class="${state.checkoutStep === 2 ? "active" : ""}" data-checkout-step="2">2. Доставка</button></div><div class="checkout-layout">${checkoutSummary()}<section class="checkout-main">${state.checkoutStep === 1 ? checkoutDataStep() : checkoutDeliveryStep()}</section></div></div>`; }
-function successView() { const order = state.lastOrder || { number: "OM-2026-0000", total: 0 }; return `<div class="success-view content-width"><section class="success-card"><i>✓</i><p>Заявка ${order.number}</p><h1>Заявка отправлена</h1><span>Менеджер свяжется с вами, чтобы подтвердить наличие и доставку. Оплата на сайте не списывалась.</span><strong>${money(order.total)}</strong><button class="red-button" data-section="Кроссовки">В каталог</button></section></div>`; }
-function termsView() { return `<div class="terms-view content-width"><section class="terms-intro"><b>OUTMAX</b><h1>Скидка до 50%</h1><p>Размер скидки зависит от суммы вашей корзины до применения акции.</p><button class="red-button" data-section="Кроссовки">В каталог</button></section><section class="terms-steps">${[["01", "Добавляйте товары", "Сумма считается по ценам до скидки."], ["02", "Достигайте порога", "Чем выше сумма — тем выше процент."], ["03", "Получайте выгоду", "Скидка применяется автоматически в заявке."]].map(([n, h, p]) => `<article><b>${n}</b><h2>${h}</h2><p>${p}</p></article>`).join("")}</section><section class="discount-table"><h2>Таблица скидок</h2><div><header><span>Сумма корзины</span><span>Скидка</span></header>${thresholds.map((item) => `<p><span>от ${money(item.sum)}</span><b>${item.discount}%</b></p>`).join("")}</div></section></div>`; }
+function successView() { const order = state.lastOrder || { number: "OM-2026-0000" }; return `<div class="success-view content-width"><section class="success-card" aria-labelledby="success-title"><span class="success-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m13 25 7 7 15-17" /></svg></span><p class="success-order">Заявка ${escapeHtml(order.number)}</p><h1 id="success-title"><span>Спасибо!</span>Ваша заявка принята</h1><p class="success-message">В ближайшее время наш менеджер позвонит вам с номера <a href="tel:+73912029868">+7 (391) 202-98-68</a>, уточнит детали и поможет завершить оформление заказа.</p><p class="success-hours"><strong>Рабочее время:</strong> с 7:00 до 19:00 (МСК).</p><button class="red-button" data-section="Кроссовки">В каталог</button></section></div>`; }
+function termsView() { const steps = [["01", "Добавляйте товары", "Сумма считается по ценам до скидки."], ["02", "Достигайте порога", "Чем выше сумма — тем выше процент."], ["03", "Получайте выгоду", "Скидка применяется автоматически в заказе."], ["04", "Доставка", "В рамках акции доставка платная."], ["05", "Оплата", "Доставка оплачивается на сайте.<br />Товар — при получении."], ["06", "Выкуп", "Заказ можно выкупить только целиком."], ["07", "Возврат", "Осуществляется по согласованию с интернет-магазином."]]; return `<div class="terms-view content-width"><section class="terms-intro"><b>OUTMAX</b><h1>Условия акции</h1><p>Скидка до 50% — чем выше сумма корзины, тем больше выгода.</p><button class="red-button" data-section="Кроссовки">В каталог</button></section><section class="terms-steps">${steps.map(([n, h, p]) => `<article><b>${n}</b><h2>${h}</h2><p>${p}</p></article>`).join("")}</section><section class="discount-table"><h2>Таблица скидок</h2><div><header><span>Сумма корзины</span><span>Скидка</span></header>${thresholds.map((item) => `<p><span>от ${money(item.sum)}</span><b>${item.discount}%</b></p>`).join("")}</div></section></div>`; }
 function view() { if (state.route === "catalog") return catalogView(); if (state.route === "product") return productView(); if (state.route === "cart") return cartView(); if (state.route === "checkout") return checkoutView(); if (state.route === "success") return successView(); if (state.route === "terms") return termsView(); return homeView(); }
 
-function render({ keepScroll = false } = {}) { const scrollY = window.scrollY; app.innerHTML = `<div class="site-shell route-${state.route}">${header()}<main>${view()}</main>${bottomNav()}</div>`; document.body.classList.toggle("filter-open", state.filterOpen); bindEvents(); if (keepScroll) requestAnimationFrame(() => window.scrollTo(0, scrollY)); else window.scrollTo(0, 0); }
-function navigate(route) { state.route = route; history.replaceState(null, "", `#${route}`); render(); }
+function restoreScrollPosition(scrollY) {
+  requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: scrollY, left: 0, behavior: "auto" })));
+}
+
+function render({ keepScroll = false, restoreScroll = null, routeTransition = false } = {}) {
+  const scrollY = restoreScroll ?? (keepScroll ? window.scrollY : 0);
+  app.innerHTML = `<div class="site-shell route-${state.route} ${routeTransition ? "route-entering" : ""}">${header()}<main>${view()}</main>${bottomNav()}</div>`;
+  document.body.classList.toggle("filter-open", state.filterOpen);
+  bindEvents();
+  restoreScrollPosition(scrollY);
+}
+
+function persistCurrentHistory() {
+  const depth = history.state?.outmaxDepth || 0;
+  history.replaceState({ outmax: true, outmaxDepth: depth, snapshot: snapshotState() }, "", routeUrl());
+}
+
+function navigate(route, { beforeEnter, replace = false, scrollY = 0 } = {}) {
+  persistCurrentHistory();
+  if (beforeEnter) beforeEnter();
+  state.route = route;
+  state.filterOpen = false;
+  const currentDepth = history.state?.outmaxDepth || 0;
+  const nextDepth = replace ? currentDepth : currentDepth + 1;
+  const method = replace ? "replaceState" : "pushState";
+  history[method]({ outmax: true, outmaxDepth: nextDepth, snapshot: snapshotState(scrollY) }, "", routeUrl(route));
+  render({ restoreScroll: scrollY, routeTransition: true });
+}
+
+function returnFromProduct() {
+  if ((history.state?.outmaxDepth || 0) > 0) {
+    history.back();
+    return;
+  }
+  navigate("catalog", { replace: true, beforeEnter: () => { state.section = state.selectedProduct?.section || "Кроссовки"; state.filter = "Все"; state.visibleCount = 18; } });
+}
+
+const springSelector = [
+  ".quick-tab", ".category-grid > button", ".catalog-chips button", ".filter-option", ".filter-drawer footer button",
+  ".card-size-button", ".product-open", ".load-more", ".product-back", ".thumbs button", ".sizes button", ".red-button",
+  ".outline-button", ".bottom-nav button", ".quantity button", ".cart-remove", ".checkout-tabs button", ".delivery-option",
+].join(",");
+let activePress = null;
+
+function rubberBand(distance, dimension = 12, constant = 0.48) {
+  const value = (1 - (1 / ((Math.abs(distance) * constant / dimension) + 1))) * dimension;
+  return Math.sign(distance) * value;
+}
+
+function releaseSpring(event) {
+  if (!activePress || (event.pointerId !== undefined && event.pointerId !== activePress.pointerId)) return;
+  const { target, x, y } = activePress;
+  activePress = null;
+  target.style.removeProperty("transition");
+  target.style.removeProperty("transform");
+  target.style.removeProperty("will-change");
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const animation = target.animate([
+    { transform: `translate3d(${x}px, ${y}px, 0) scale(.965)` },
+    { transform: "translate3d(0, 0, 0) scale(1.024)", offset: .48 },
+    { transform: "translate3d(0, 0, 0) scale(.992)", offset: .74 },
+    { transform: "translate3d(0, 0, 0) scale(1)" },
+  ], { duration: 460, easing: "cubic-bezier(.22,.86,.3,1)" });
+  animation.addEventListener("finish", () => animation.cancel(), { once: true });
+}
+
+document.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const target = event.target.closest(springSelector);
+  if (!target || target.disabled) return;
+  target.getAnimations().forEach((animation) => animation.cancel());
+  activePress = { target, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: 0, y: 0 };
+  target.style.willChange = "transform";
+  target.style.transition = "transform 110ms cubic-bezier(.22,1,.36,1)";
+  target.style.transform = "translate3d(0,0,0) scale(.965)";
+}, { passive: true });
+
+document.addEventListener("pointermove", (event) => {
+  if (!activePress || event.pointerId !== activePress.pointerId) return;
+  const x = rubberBand(event.clientX - activePress.startX);
+  const y = rubberBand(event.clientY - activePress.startY);
+  activePress.x = Number(x.toFixed(2));
+  activePress.y = Number(y.toFixed(2));
+  activePress.target.style.transition = "none";
+  activePress.target.style.transform = `translate3d(${activePress.x}px, ${activePress.y}px, 0) scale(.965)`;
+}, { passive: true });
+
+document.addEventListener("pointerup", releaseSpring, { passive: true });
+document.addEventListener("pointercancel", releaseSpring, { passive: true });
 function showToast(message) { toast.textContent = message; toast.classList.add("show"); clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.remove("show"), 2600); }
-function addToCart(productId) { const product = products.find((item) => item.id === productId); if (!product) return; if (!state.selectedSize) { showToast("Сначала выберите размер"); return; } const existing = state.cart.find((item) => item.product.id === product.id && String(item.size) === String(state.selectedSize)); if (existing) existing.quantity += 1; else state.cart.push({ id: `${product.id}-${state.selectedSize}-${Date.now()}`, product, size: state.selectedSize, quantity: 1 }); saveCart(); showToast("Товар добавлен в корзину"); render({ keepScroll: true }); }
+function putCartItem(product, size) { const existing = state.cart.find((item) => item.product.id === product.id && String(item.size) === String(size)); if (existing) existing.quantity += 1; else state.cart.push({ id: `${product.id}-${size}-${Date.now()}`, product, size, quantity: 1 }); saveCart(); }
+function addToCart(productId) { const product = products.find((item) => item.id === productId); if (!product) return; if (!state.selectedSize) { showToast("Сначала выберите размер"); return; } putCartItem(product, state.selectedSize); showToast("Товар добавлен в корзину"); render({ keepScroll: true }); }
+
+function visibleCartTarget() {
+  return [...document.querySelectorAll("[data-cart-target]")].find((node) => { const rect = node.getBoundingClientRect(); const style = getComputedStyle(node); return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight && style.display !== "none" && style.visibility !== "hidden"; });
+}
+
+function createCartFlyer(image) {
+  const rect = image.getBoundingClientRect();
+  const size = Math.max(48, Math.min(72, rect.width * .42));
+  const flyer = document.createElement("span");
+  flyer.className = "cart-flyer";
+  flyer.style.width = `${size}px`;
+  flyer.style.height = `${size}px`;
+  flyer.style.left = `${rect.left + (rect.width - size) / 2}px`;
+  flyer.style.top = `${rect.top + (rect.height - size) / 2}px`;
+  flyer.innerHTML = `<img src="${image.currentSrc || image.src}" alt="" />`;
+  document.body.append(flyer);
+  return { flyer, startX: rect.left + rect.width / 2, startY: rect.top + rect.height / 2, size };
+}
+
+async function flyToCart(flight) {
+  const { flyer, startX, startY } = flight;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const target = visibleCartTarget();
+  const targetRect = target?.getBoundingClientRect();
+  const endX = targetRect ? targetRect.left + targetRect.width / 2 : innerWidth - 34;
+  const endY = targetRect ? targetRect.top + targetRect.height / 2 : 28;
+  if (reduced || !flyer.animate) { flyer.remove(); return; }
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const lift = Math.min(-72, dy * .22 - 56);
+  const animation = flyer.animate([
+    { transform: "translate3d(0,0,0) scale(1) rotate(0deg)", opacity: 1 },
+    { transform: `translate3d(${dx * .22}px, ${lift}px, 0) scale(.92) rotate(-5deg)`, opacity: 1, offset: .28 },
+    { transform: `translate3d(${dx * .68}px, ${dy * .58 + lift * .28}px, 0) scale(.58) rotate(7deg)`, opacity: .9, offset: .7 },
+    { transform: `translate3d(${dx}px, ${dy}px, 0) scale(.16) rotate(13deg)`, opacity: .2 },
+  ], { duration: 720, easing: "cubic-bezier(.22,.72,.18,1)" });
+  try { await animation.finished; } catch { /* animation was interrupted */ }
+  flyer.remove();
+  if (target?.animate) {
+    target.animate([
+      { transform: "scale(1)" },
+      { transform: "scale(1.18)", offset: .42 },
+      { transform: "scale(.95)", offset: .7 },
+      { transform: "scale(1)" },
+    ], { duration: 430, easing: "cubic-bezier(.22,.86,.3,1)" });
+  }
+}
+
+function addCardSize(button) {
+  const product = products.find((item) => item.id === button.dataset.cardProduct);
+  const size = button.dataset.cardSize;
+  const image = button.closest(".product-card")?.querySelector(".card-image img");
+  if (!product || !size || !image) return;
+  const key = `${product.id}:${size}`;
+  if (recentCardAdds.has(key)) return;
+  const flight = createCartFlyer(image);
+  recentCardAdds.add(key);
+  putCartItem(product, size);
+  render({ keepScroll: true });
+  requestAnimationFrame(() => flyToCart(flight));
+  showToast(`Размер ${size} добавлен в корзину`);
+  setTimeout(() => {
+    recentCardAdds.delete(key);
+    [...document.querySelectorAll("[data-card-product]")].filter((node) => node.dataset.cardProduct === product.id && node.dataset.cardSize === size).forEach((node) => { node.classList.remove("is-added"); node.disabled = false; node.textContent = size; node.setAttribute("aria-label", `Добавить размер ${size} в корзину`); });
+  }, 1150);
+}
 
 function bindEvents() {
   document.querySelectorAll("[data-route]").forEach((node) => node.addEventListener("click", () => navigate(node.dataset.route)));
-  document.querySelectorAll("[data-section]").forEach((node) => node.addEventListener("click", () => { state.section = node.dataset.section; state.filter = "Все"; state.filterOpen = false; state.visibleCount = 18; navigate("catalog"); }));
+  document.querySelectorAll("[data-section]").forEach((node) => node.addEventListener("click", () => navigate("catalog", { beforeEnter: () => { state.section = node.dataset.section; state.filter = "Все"; state.filterOpen = false; state.visibleCount = 18; } })));
+  const quickTabs = [...document.querySelectorAll(".quick-tab")];
+  quickTabs.forEach((tab, index) => tab.addEventListener("keydown", (event) => {
+    const last = quickTabs.length - 1;
+    const nextIndex = event.key === "ArrowRight" ? (index + 1) % quickTabs.length : event.key === "ArrowLeft" ? (index - 1 + quickTabs.length) % quickTabs.length : event.key === "Home" ? 0 : event.key === "End" ? last : null;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    quickTabs[nextIndex].focus();
+    quickTabs[nextIndex].click();
+    requestAnimationFrame(() => document.querySelector(".quick-tab.active")?.focus());
+  }));
   document.querySelectorAll("[data-filter]").forEach((node) => node.addEventListener("click", () => { state.filter = node.dataset.filter; state.advancedFilters[state.section].gender = []; state.visibleCount = 18; render(); }));
   document.querySelector("#filter-open")?.addEventListener("click", () => { state.filterOpen = true; render({ keepScroll: true }); requestAnimationFrame(() => document.querySelector("#filter-close")?.focus()); });
   const closeFilters = () => { state.filterOpen = false; state.visibleCount = 18; render({ keepScroll: true }); };
@@ -279,7 +524,9 @@ function bindEvents() {
   document.querySelector("#clear-active-filters")?.addEventListener("click", () => resetFilters(false));
   document.querySelector("#empty-reset")?.addEventListener("click", () => resetFilters(false));
   document.querySelectorAll("[data-remove-filter]").forEach((node) => node.addEventListener("click", () => { const values = state.advancedFilters[state.section][node.dataset.removeFilter]; state.advancedFilters[state.section][node.dataset.removeFilter] = values.filter((value) => String(value) !== node.dataset.removeValue); state.visibleCount = 18; render({ keepScroll: true }); }));
-  document.querySelectorAll("[data-product]").forEach((node) => node.addEventListener("click", () => { state.selectedProduct = products.find((item) => item.id === node.dataset.product); state.selectedSize = null; state.galleryIndex = 0; navigate("product"); }));
+  document.querySelectorAll("[data-card-size]").forEach((node) => node.addEventListener("click", () => addCardSize(node)));
+  document.querySelectorAll("[data-product]").forEach((node) => node.addEventListener("click", () => navigate("product", { beforeEnter: () => { state.selectedProduct = products.find((item) => item.id === node.dataset.product); state.selectedSize = null; state.galleryIndex = 0; } })));
+  document.querySelector("#product-back")?.addEventListener("click", returnFromProduct);
   document.querySelectorAll("[data-gallery]").forEach((node) => node.addEventListener("click", () => { state.galleryIndex = Number(node.dataset.gallery); render({ keepScroll: true }); }));
   document.querySelectorAll("[data-size]").forEach((node) => node.addEventListener("click", () => { state.selectedSize = node.dataset.size; render({ keepScroll: true }); }));
   document.querySelectorAll("[data-add]").forEach((node) => node.addEventListener("click", () => addToCart(node.dataset.add)));
@@ -288,17 +535,35 @@ function bindEvents() {
   document.querySelector("#clear-cart")?.addEventListener("click", () => { state.cart = []; saveCart(); render(); });
   document.querySelectorAll("[data-remove]").forEach((node) => node.addEventListener("click", () => { state.cart = state.cart.filter((item) => item.id !== node.dataset.remove); saveCart(); render({ keepScroll: true }); }));
   document.querySelectorAll("[data-qty]").forEach((node) => node.addEventListener("click", () => { const item = state.cart.find((row) => row.id === node.dataset.cartId); if (!item) return; item.quantity = Math.max(1, item.quantity + Number(node.dataset.qty)); saveCart(); render({ keepScroll: true }); }));
-  document.querySelector("#checkout-button")?.addEventListener("click", () => { state.checkoutStep = 1; navigate("checkout"); });
+  document.querySelector("#checkout-button")?.addEventListener("click", () => navigate("checkout", { beforeEnter: () => { state.checkoutStep = 1; } }));
   document.querySelectorAll("[data-checkout-step]").forEach((node) => node.addEventListener("click", () => { const step = Number(node.dataset.checkoutStep); if (step === 1 || state.checkout.name) { state.checkoutStep = step; render(); } }));
   document.querySelector("#checkout-data-form")?.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.checkout = { ...state.checkout, name: String(data.get("name") || "").trim(), phone: String(data.get("phone") || "").trim(), city: String(data.get("city") || "").trim(), comment: String(data.get("comment") || "").trim() }; if (!state.checkout.name || !state.checkout.phone || !state.checkout.city) { document.querySelector("#form-error").textContent = "Заполните имя, телефон и город."; return; } state.checkoutStep = 2; render(); });
   document.querySelectorAll('input[name="delivery"]').forEach((node) => node.addEventListener("change", () => { state.checkout.delivery = node.value; render({ keepScroll: true }); }));
   document.querySelectorAll('input[name="pickup"]').forEach((node) => node.addEventListener("change", () => { state.checkout.pickup = node.value; render({ keepScroll: true }); }));
   document.querySelector("#checkout-back")?.addEventListener("click", () => { state.checkoutStep = 1; render(); });
-  document.querySelector("#checkout-submit")?.addEventListener("click", async (event) => { const button = event.currentTarget; const amounts = orderAmounts(); const selected = deliveryOptions.find((item) => item.id === state.checkout.delivery); button.disabled = true; button.textContent = "Отправляем…"; try { await sendOrderToTelegram({ customer: state.checkout, delivery: selected, amounts, items: state.cart.map((item) => ({ name: item.product.name, article: item.product.article, size: item.size, quantity: item.quantity, lineTotal: item.product.price * item.quantity })) }); } catch { button.disabled = false; button.textContent = "Отправить заявку"; showToast("Не удалось отправить заявку. Проверьте TG BOT.txt и подключение."); return; } state.lastOrder = { number: `OM-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`, total: amounts.total }; state.cart = []; saveCart(); navigate("success"); });
+  document.querySelector("#checkout-submit")?.addEventListener("click", async (event) => { const button = event.currentTarget; const amounts = orderAmounts(); const selected = deliveryOptions.find((item) => item.id === state.checkout.delivery); button.disabled = true; button.textContent = "Отправляем…"; try { await sendOrderToTelegram({ customer: state.checkout, delivery: selected, amounts, items: state.cart.map((item) => ({ name: item.product.name, article: item.product.article, size: item.size, quantity: item.quantity, lineTotal: item.product.price * item.quantity })) }); } catch { button.disabled = false; button.textContent = "Отправить заявку"; showToast("Не удалось отправить заявку. Проверьте TG BOT.txt и подключение."); return; } const order = { number: `OM-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`, total: amounts.total }; navigate("success", { beforeEnter: () => { state.lastOrder = order; state.cart = []; saveCart(); } }); });
 }
 
 restoreCart();
-const initialRoute = location.hash.slice(1);
-if (["home", "catalog", "product", "cart", "checkout", "success", "terms"].includes(initialRoute)) state.route = initialRoute;
+const initialLocation = readLocation();
+state.route = initialLocation.route;
+if (initialLocation.section) state.section = initialLocation.section;
+if (initialLocation.productId) state.selectedProduct = products.find((item) => item.article === initialLocation.productId || item.id === initialLocation.productId) || state.selectedProduct;
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+const restoredInitialSnapshot = history.state?.outmax ? history.state.snapshot : null;
+if (restoredInitialSnapshot) restoreSnapshot(restoredInitialSnapshot);
+history.replaceState({ outmax: true, outmaxDepth: history.state?.outmaxDepth || 0, snapshot: snapshotState(restoredInitialSnapshot?.scrollY || 0) }, "", routeUrl());
+window.addEventListener("popstate", (event) => {
+  if (event.state?.outmax && event.state.snapshot) {
+    restoreSnapshot(event.state.snapshot);
+    render({ restoreScroll: event.state.snapshot.scrollY || 0, routeTransition: true });
+    return;
+  }
+  const locationState = readLocation();
+  state.route = locationState.route;
+  if (locationState.section) state.section = locationState.section;
+  if (locationState.productId) state.selectedProduct = products.find((item) => item.article === locationState.productId || item.id === locationState.productId) || state.selectedProduct;
+  render({ routeTransition: true });
+});
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.filterOpen) { state.filterOpen = false; render({ keepScroll: true }); } });
-render();
+render({ restoreScroll: restoredInitialSnapshot?.scrollY || 0 });
