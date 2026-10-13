@@ -328,16 +328,23 @@ function successView() { const order = state.lastOrder || { number: "OM-2026-000
 function termsView() { const steps = [["01", "Добавляйте товары", "Сумма считается по ценам до скидки."], ["02", "Достигайте порога", "Чем выше сумма — тем выше процент."], ["03", "Получайте выгоду", "Скидка применяется автоматически в заказе."], ["04", "Доставка", "В рамках акции доставка платная."], ["05", "Оплата", "Доставка оплачивается на сайте.<br />Товар — при получении."], ["06", "Выкуп", "Заказ можно выкупить только целиком."], ["07", "Возврат", "Осуществляется по согласованию с интернет-магазином."]]; return `<div class="terms-view content-width"><section class="terms-intro"><b>OUTMAX</b><h1>Условия акции</h1><p>Скидка до 50% — чем выше сумма корзины, тем больше выгода.</p><button class="red-button" data-section="Кроссовки">В каталог</button></section><section class="terms-steps">${steps.map(([n, h, p]) => `<article><b>${n}</b><h2>${h}</h2><p>${p}</p></article>`).join("")}</section><section class="discount-table"><h2>Таблица скидок</h2><div><header><span>Сумма корзины</span><span>Скидка</span></header>${thresholds.map((item) => `<p><span>от ${money(item.sum)}</span><b>${item.discount}%</b></p>`).join("")}</div></section></div>`; }
 function view() { if (state.route === "catalog") return catalogView(); if (state.route === "product") return productView(); if (state.route === "cart") return cartView(); if (state.route === "checkout") return checkoutView(); if (state.route === "success") return successView(); if (state.route === "terms") return termsView(); return homeView(); }
 
-function restoreScrollPosition(scrollY) {
-  requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: scrollY, left: 0, behavior: "auto" })));
+function restoreScrollPosition(scrollY, { immediate = false } = {}) {
+  const scroll = () => window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
+  if (immediate) {
+    scroll();
+    return;
+  }
+  requestAnimationFrame(() => requestAnimationFrame(scroll));
 }
 
 function render({ keepScroll = false, restoreScroll = null, routeTransition = false } = {}) {
   const scrollY = restoreScroll ?? (keepScroll ? window.scrollY : 0);
+  const productOpening = state.route === "product" && restoreScroll === 0;
+  if (productOpening) restoreScrollPosition(0, { immediate: true });
   app.innerHTML = `<div class="site-shell route-${state.route} ${routeTransition ? "route-entering" : ""}">${header()}<main>${view()}</main>${bottomNav()}</div>`;
   document.body.classList.toggle("filter-open", state.filterOpen);
   bindEvents();
-  restoreScrollPosition(scrollY);
+  restoreScrollPosition(scrollY, { immediate: productOpening });
 }
 
 function persistCurrentHistory() {
