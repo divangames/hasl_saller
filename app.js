@@ -207,7 +207,7 @@ function quickSectionsNav(extraClass = "") {
     const active = (state.route === "catalog" && state.section === section) || (state.route === "product" && state.selectedProduct?.section === section);
     const iconClass = sectionSlugs[section];
     const imageName = iconClass === "accessories" ? "other" : iconClass;
-    return `<button data-section="${section}" class="quick-tab ${active ? "active" : ""}" role="tab" aria-selected="${active}"><span class="quick-tab-image" aria-hidden="true"><img src="${publicUrl(`images/taps/${imageName}.svg?v=20261013d`)}" alt="" /></span><span class="quick-tab-copy"><span>${section}</span><b>${count}</b></span></button>`;
+    return `<button data-section="${section}" class="quick-tab ${active ? "active" : ""}" role="tab" aria-selected="${active}"><span class="quick-tab-image" aria-hidden="true"><img src="${publicUrl(`images/taps/${imageName}_02.png?v=20261013e`)}" alt="" /></span><span class="quick-tab-copy"><span>${section}</span><b>${count}</b></span></button>`;
   }).join("");
   return `<nav class="quick-sections ${extraClass}" role="tablist" aria-label="Категории товаров">${buttons}</nav>`;
 }

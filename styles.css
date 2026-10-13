@@ -121,15 +121,15 @@ img { display: block; max-width: 100%; }
 .desktop-header { height: 64px; display: flex; align-items: center; gap: 22px; border: 1px solid rgba(17,17,17,.055); border-radius: 20px; box-shadow: 0 8px 28px rgba(17,17,17,.055); }
 .quick-sections { display: grid; padding-top: 7px; padding-bottom: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .quick-sections button { position: relative; display: flex; min-width: 0; height: 54px; padding: 5px 12px 5px 6px; overflow: hidden; align-items: center; justify-content: flex-start; gap: 9px; border: 1px solid rgba(17,17,17,.075); border-radius: 16px; background: rgba(255,255,255,.94); color: #292929; box-shadow: 0 4px 14px rgba(17,17,17,.06), inset 0 1px rgba(255,255,255,.72); font-size: 12px; font-weight: 700; transform: translateZ(0); transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 220ms ease, transform 140ms var(--spring-press); }
-.quick-tab-image { position: relative; z-index: 1; display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; transition: transform 220ms var(--spring-enter); }
-.quick-tab-image img { display: block; width: 100%; height: 100%; object-fit: contain; transform: scale(.9); transition: filter 180ms ease, transform 240ms var(--spring-enter); }
+.quick-tab-image { position: relative; z-index: 1; display: grid; width: 42px; height: 42px; overflow: hidden; flex: 0 0 42px; place-items: center; border: 1px solid rgba(17,17,17,.08); border-radius: 12px; background: #f1f1f1; transition: transform 220ms var(--spring-enter); }
+.quick-tab-image img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1); transition: transform 240ms var(--spring-enter); }
 .quick-tab-copy { position: relative; z-index: 1; display: flex; min-width: 0; align-items: flex-start; justify-content: center; flex-direction: column; gap: 2px; line-height: 1.1; text-align: left; }
 .quick-tab-copy > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quick-sections button b { color: var(--muted); font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .quick-sections button.active { border-color: var(--brand); background: linear-gradient(135deg, #ff4b56 0%, var(--brand) 52%, #ee1f2c 100%); color: white; box-shadow: 0 8px 19px rgba(255,57,69,.25), inset 0 1px rgba(255,255,255,.22); }
 .quick-sections button.active::after { position: absolute; top: -30%; right: -12%; width: 64%; height: 170%; border-radius: 50%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.2), transparent); content: ""; pointer-events: none; transform: rotate(16deg); }
 .quick-sections button.active .quick-tab-image { animation: quick-tab-selected 440ms var(--spring-enter) both; }
-.quick-sections button.active .quick-tab-image img { filter: invert(1); }
+.quick-sections button.active .quick-tab-image { border-color: rgba(255,255,255,.5); }
 .quick-sections button.active b { color: rgba(255,255,255,.82); }
 .quick-sections button:active { transform: scale(.965); }
 .quick-sections button:active .quick-tab-image img { transform: scale(1.13) rotate(-2deg); }
