@@ -1,13 +1,15 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 setlocal EnableExtensions
 
-cd /d "%~dp0"
-set "HASL_PORT=4173"
-set "HASL_URL=http://127.0.0.1:%HASL_PORT%/#home"
+set "HASL_ROOT=%~dp0."
+cd /d "%HASL_ROOT%"
+set "HASL_START_PORT=4317"
 set "HASL_REPO=https://github.com/divangames/hasl_saller.git"
 set "HASL_REPO_SLUG=divangames/hasl_saller"
 set "HASL_PAGES=https://divangames.github.io/hasl_saller/"
+
+if /I "%~1"=="--launch" goto launch_once
 
 :menu
 cls
@@ -33,6 +35,10 @@ if errorlevel 1 goto launch
 call :start_site
 pause
 goto menu
+
+:launch_once
+call :start_site
+exit /b %errorlevel%
 
 :commit
 call :commit_changes
@@ -69,9 +75,24 @@ pause
 goto menu
 
 :start_site
-powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort %HASL_PORT% -State Listen -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+set "HASL_PORT=%HASL_START_PORT%"
+
+:find_hasl_port
+if %HASL_PORT% GTR 4399 (
+  echo Не удалось подобрать порт для локального сервера ХАСЛ.
+  exit /b 1
+)
+set "HASL_URL=http://127.0.0.1:%HASL_PORT%/#home"
+
+powershell -NoProfile -Command "try { $html = (Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:%HASL_PORT%/index.html' -TimeoutSec 1).Content; if ($html.Contains('images/hasle_logo.svg')) { exit 0 } } catch {}; exit 1"
 if not errorlevel 1 goto open_site
 
+powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort %HASL_PORT% -State Listen -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+if errorlevel 1 goto start_hasl_server
+set /a HASL_PORT+=1
+goto find_hasl_port
+
+:start_hasl_server
 where py >nul 2>nul
 if not errorlevel 1 (
   set "HASL_PYTHON=py"
@@ -84,11 +105,15 @@ if not errorlevel 1 (
   set "HASL_PYTHON=python"
 )
 
-start "HASL SALE Server" /min cmd /k %HASL_PYTHON% -m http.server %HASL_PORT%
-timeout /t 1 /nobreak >nul
+start "HASL SALE Server" /min %HASL_PYTHON% -m http.server %HASL_PORT% --bind 127.0.0.1 --directory "%HASL_ROOT%"
+powershell -NoProfile -Command "$url = 'http://127.0.0.1:%HASL_PORT%/index.html'; for ($attempt = 0; $attempt -lt 20; $attempt++) { try { $html = (Invoke-WebRequest -UseBasicParsing $url -TimeoutSec 1).Content; if ($html.Contains('images/hasle_logo.svg')) { exit 0 } } catch {}; Start-Sleep -Milliseconds 250 }; exit 1"
+if errorlevel 1 (
+  echo Сервер запущен, но страница ХАСЛ не прошла проверку.
+  exit /b 1
+)
 
 :open_site
-start "" "%HASL_URL%"
+if not defined HASL_SKIP_BROWSER start "" "%HASL_URL%"
 echo Сайт открыт: %HASL_URL%
 exit /b 0
 
