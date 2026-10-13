@@ -45,7 +45,7 @@ img { display: block; max-width: 100%; }
 .meter-animate .meter-fill { animation: meter-fill 850ms cubic-bezier(.25, 1, .5, 1) both, stripe-flow 900ms linear infinite; }
 .meter-runner { position: absolute; z-index: 1; left: 0; top: 50%; width: 100%; height: 6px; border-radius: 99px; background: repeating-linear-gradient(90deg, rgba(145,145,145,.9) 0 8px, rgba(145,145,145,0) 8px 13px); opacity: 0; transform: translateY(-50%) scaleX(var(--meter-to)); transform-origin: left center; pointer-events: none; }
 .meter-animate .meter-runner { animation: meter-runner 850ms cubic-bezier(.25, 1, .5, 1) both; }
-.discount-track > b { position: relative; z-index: 2; display: grid; width: 14px; height: 14px; place-items: center; border: 2px solid var(--discount-color); border-radius: 50%; background: var(--discount-color); color: white; font-size: 8px; line-height: 1; }
+.discount-track > b { position: relative; z-index: 2; display: grid; width: 14px; height: 14px; place-items: center; border: 2px solid #d4d4d4; border-radius: 50%; background: #d4d4d4; color: white; font-size: 8px; line-height: 1; }
 .discount-track > b.reached { border-color: var(--discount-color); background: var(--discount-color); }
 .discount-track > b:nth-of-type(1), .discount-labels > span:nth-child(1), .discount-table p:nth-of-type(1) { --discount-color: #92c893; }
 .discount-track > b:nth-of-type(2), .discount-labels > span:nth-child(2), .discount-table p:nth-of-type(2) { --discount-color: #8fc999; }
