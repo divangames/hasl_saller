@@ -1,4 +1,4 @@
-name: Deploy OUTMAX SALE to GitHub Pages
+name: Deploy HASL SALE to GitHub Pages
 
 on:
   push:

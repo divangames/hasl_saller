@@ -7,7 +7,7 @@ const makeProduct = (section, name, article, price, oldPrice, image, options = {
   image: image.startsWith("http") || image.startsWith(".") ? image : `${A}/${image}`,
   gender: options.gender || "Мужские",
   sizes: options.sizes || (section === "Одежда" ? [44, 46, 48, 50, 52, 54] : section === "Аксессуары" ? ["ONE"] : [41, 42, 43, 44, 45, 46]),
-  brand: options.brand || "OUTMAX", gallery: options.gallery,
+  brand: options.brand || "ХАСЛ", gallery: options.gallery,
 });
 
 const sneakerSeeds = [
@@ -90,7 +90,7 @@ const filterSchemas = {
 };
 
 const knownBrands = ["The North Face", "Under Armour", "Stone Island", "New Balance", "GOLOV.EJOY", "PATAGONIA", "ESSENTIALS", "Timberland", "Salomon", "Warchief", "Adidas", "Gucci", "Hoka", "LOWA", "Nike", "Puma"];
-products.forEach((product) => { if (product.brand === "OUTMAX") product.brand = knownBrands.find((brand) => product.name.toLowerCase().includes(brand.toLowerCase())) || "ONE"; });
+products.forEach((product) => { if (product.brand === "ХАСЛ") product.brand = knownBrands.find((brand) => product.name.toLowerCase().includes(brand.toLowerCase())) || "ONE"; });
 
 const emptyFilterState = () => ({ size: [], season: [], gender: [], brand: [], model: [], category: [], item: [], kind: [] });
 const state = { route: "home", section: "Кроссовки", filter: "Все", advancedFilters: { "Кроссовки": emptyFilterState(), "Одежда": emptyFilterState(), "Аксессуары": emptyFilterState() }, filterOpen: false, visibleCount: 18, selectedProduct: products.find((item) => item.article === "46419") || products[0], selectedSize: null, galleryIndex: 0, cart: [], checkoutStep: 1, checkout: { name: "", phone: "", city: "", comment: "", delivery: "pickup", pickup: "MSK2181" }, lastOrder: null };
@@ -158,15 +158,15 @@ function restoreSnapshot(snapshot) {
   state.filterOpen = false;
 }
 
-function restoreCart() { try { const rows = JSON.parse(localStorage.getItem("outmax_prototype_cart") || "[]"); state.cart = rows.map((row) => ({ ...row, product: products.find((item) => item.id === row.productId) })).filter((row) => row.product); } catch { state.cart = []; } }
-function saveCart() { localStorage.setItem("outmax_prototype_cart", JSON.stringify(state.cart.map((row) => ({ id: row.id, productId: row.product.id, size: row.size, quantity: row.quantity })))); }
+function restoreCart() { try { const rows = JSON.parse(localStorage.getItem("hasl_sale_cart") || localStorage.getItem("outmax_prototype_cart") || "[]"); state.cart = rows.map((row) => ({ ...row, product: products.find((item) => item.id === row.productId) })).filter((row) => row.product); } catch { state.cart = []; } }
+function saveCart() { localStorage.setItem("hasl_sale_cart", JSON.stringify(state.cart.map((row) => ({ id: row.id, productId: row.product.id, size: row.size, quantity: row.quantity })))); }
 
 async function sendOrderToTelegram(order) {
   const config = await fetch(publicUrl("TG%20BOT.txt"), { cache: "no-store" }).then((response) => { if (!response.ok) throw new Error("Telegram config not found"); return response.text(); });
   const token = config.match(/^\s*Token\s*:\s*(\S+)\s*$/im)?.[1];
   const chatId = config.match(/^\s*Id\s*:\s*(-?\d+)\s*$/im)?.[1];
   if (!token || !chatId) throw new Error("Telegram config is invalid");
-  const lines = ["🛍 Новая тестовая заявка OUTMAX SALE", "", `Имя: ${order.customer.name || "—"}`, `Телефон: ${order.customer.phone || "—"}`, `Город: ${order.customer.city || "—"}`];
+  const lines = ["🛍 Новая тестовая заявка ХАСЛ", "", `Имя: ${order.customer.name || "—"}`, `Телефон: ${order.customer.phone || "—"}`, `Город: ${order.customer.city || "—"}`];
   if (order.customer.comment) lines.push(`Комментарий: ${order.customer.comment}`);
   lines.push("", "Товары:");
   order.items.forEach((item) => lines.push(`• ${item.name} · размер ${item.size} · ${item.quantity} шт. · ${money(item.lineTotal)}`));
@@ -226,7 +226,7 @@ function navigationButtons(items = navigationItems) {
 
 function header() {
   const discountHeader = ["home", "success"].includes(state.route) ? "" : `<div class="sticky-head"><div class="head-inner">${discountDashboard()}</div>${quickSectionsNav("head-inner")}</div>`;
-  return `${discountHeader}<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="На главную"><img src="${publicUrl("images/outmax_logo.svg")}" alt="Outmax" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopNavigationItems)}</nav></header>`;
+  return `${discountHeader}<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="ХАСЛ — на главную"><img src="${publicUrl("images/hasle_logo.svg")}" alt="ХАСЛ" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopNavigationItems)}</nav></header>`;
 }
 
 function bottomNav() {
@@ -234,7 +234,7 @@ function bottomNav() {
 }
 
 function homeView() {
-  return `<div class="home-view"><button class="hero" data-route="terms"><img src="${publicUrl("images/banners/main_02.png")}" alt="Скидка до 50%" /><span class="hero-overlay"></span><span class="hero-copy"><b>Акция</b><strong>Скидка до 50%</strong><small>Чем выше сумма корзины — тем больше скидка.<br />Подробные условия внутри.</small></span></button><div class="home-filter-stack"><div class="home-filter-inner">${discountDashboard()}</div></div><section class="categories-section"><div class="section-title"><h2>Категории</h2></div><div class="category-grid"><button data-section="Кроссовки"><img src="${publicUrl("images/banners/sneakers_02.png?v=f3f9c50b")}" alt="Кроссовки" /><span><strong>Кроссовки</strong><small>2 000+</small></span></button><button data-section="Одежда"><img src="${publicUrl("images/banners/clothes_02.png?v=20261013c")}" alt="Одежда" /><span><strong>Одежда</strong><small>1 000+</small></span></button><button data-section="Аксессуары"><img src="${publicUrl("images/banners/other_02.png?v=20261013c")}" alt="Аксессуары" /><span><strong>Аксессуары</strong><small>500+</small></span></button></div>${saleTermsNote()}</section></div>`;
+  return `<div class="home-view"><button class="hero" data-route="terms"><img src="${publicUrl("images/banners/main_02.png")}" alt="Скидка до 50%" /><span class="hero-overlay"></span><span class="hero-copy"><b>Акция</b><h1>Скидка до 50%</h1><small>Чем выше сумма корзины — тем больше скидка.<br />Подробные условия внутри.</small></span></button><div class="home-filter-stack"><div class="home-filter-inner">${discountDashboard()}</div></div><section class="categories-section"><div class="section-title"><h2>Категории</h2></div><div class="category-grid"><button data-section="Кроссовки"><img src="${publicUrl("images/banners/sneakers_02.png?v=f3f9c50b")}" alt="Кроссовки" /><span><strong>Кроссовки</strong><small>2 000+</small></span></button><button data-section="Одежда"><img src="${publicUrl("images/banners/clothes_02.png?v=20261013c")}" alt="Одежда" /><span><strong>Одежда</strong><small>1 000+</small></span></button><button data-section="Аксессуары"><img src="${publicUrl("images/banners/other_02.png?v=20261013c")}" alt="Аксессуары" /><span><strong>Аксессуары</strong><small>500+</small></span></button></div>${saleTermsNote()}</section></div>`;
 }
 
 function normalizedGender(gender) { return ({ "Детские": "Детский", "Женские": "Женский", "Мужские": "Мужской" })[gender] || gender; }
@@ -325,7 +325,7 @@ function checkoutDeliveryStep() {
 }
 function checkoutView() { if (!state.cart.length) return `<div class="checkout-view content-width"><div class="empty-card"><h1>Корзина пуста</h1><button class="red-button" data-section="Кроссовки">В каталог</button></div></div>`; return `<div class="checkout-view content-width"><h1>Оформление</h1><div class="checkout-tabs"><button class="${state.checkoutStep === 1 ? "active" : ""}" data-checkout-step="1">1. Данные</button><button class="${state.checkoutStep === 2 ? "active" : ""}" data-checkout-step="2">2. Доставка</button></div><div class="checkout-layout">${checkoutSummary()}<section class="checkout-main">${state.checkoutStep === 1 ? checkoutDataStep() : checkoutDeliveryStep()}</section></div></div>`; }
 function successView() { const order = state.lastOrder || { number: "OM-2026-0000" }; return `<div class="success-view content-width"><section class="success-card" aria-labelledby="success-title"><span class="success-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m13 25 7 7 15-17" /></svg></span><p class="success-order">Заявка ${escapeHtml(order.number)}</p><h1 id="success-title"><span>Спасибо!</span>Ваша заявка принята</h1><p class="success-message">В ближайшее время наш менеджер позвонит вам с номера <a href="tel:+73912029868">+7 (391) 202-98-68</a>, уточнит детали и поможет завершить оформление заказа.</p><p class="success-hours"><strong>Рабочее время:</strong> с 7:00 до 19:00 (МСК).</p><button class="red-button" data-section="Кроссовки">В каталог</button></section></div>`; }
-function termsView() { const steps = [["01", "Добавляйте товары", "Сумма считается по ценам до скидки."], ["02", "Достигайте порога", "Чем выше сумма — тем выше процент."], ["03", "Получайте выгоду", "Скидка применяется автоматически в заказе."], ["04", "Доставка", "В рамках акции доставка платная."], ["05", "Оплата", "Доставка оплачивается на сайте.<br />Товар — при получении."], ["06", "Выкуп", "Заказ можно выкупить только целиком."], ["07", "Возврат", "Осуществляется по согласованию с интернет-магазином."]]; return `<div class="terms-view content-width"><section class="terms-intro"><b>OUTMAX</b><h1>Условия акции</h1><p>Скидка до 50% — чем выше сумма корзины, тем больше выгода.</p><button class="red-button" data-section="Кроссовки">В каталог</button></section><section class="terms-steps">${steps.map(([n, h, p]) => `<article><b>${n}</b><h2>${h}</h2><p>${p}</p></article>`).join("")}</section><section class="discount-table"><h2>Таблица скидок</h2><div><header><span>Сумма корзины</span><span>Скидка</span></header>${thresholds.map((item) => `<p><span>от ${money(item.sum)}</span><b>${item.discount}%</b></p>`).join("")}</div></section></div>`; }
+function termsView() { const steps = [["01", "Добавляйте товары", "Сумма считается по ценам до скидки."], ["02", "Достигайте порога", "Чем выше сумма — тем выше процент."], ["03", "Получайте выгоду", "Скидка применяется автоматически в заказе."], ["04", "Доставка", "В рамках акции доставка платная."], ["05", "Оплата", "Доставка оплачивается на сайте.<br />Товар — при получении."], ["06", "Выкуп", "Заказ можно выкупить только целиком."], ["07", "Возврат", "Осуществляется по согласованию с интернет-магазином."]]; return `<div class="terms-view content-width"><section class="terms-intro"><b>ХАСЛ</b><h1>Условия акции</h1><p>Скидка до 50% — чем выше сумма корзины, тем больше выгода.</p><button class="red-button" data-section="Кроссовки">В каталог</button></section><section class="terms-steps">${steps.map(([n, h, p]) => `<article><b>${n}</b><h2>${h}</h2><p>${p}</p></article>`).join("")}</section><section class="discount-table"><h2>Таблица скидок</h2><div><header><span>Сумма корзины</span><span>Скидка</span></header>${thresholds.map((item) => `<p><span>от ${money(item.sum)}</span><b>${item.discount}%</b></p>`).join("")}</div></section></div>`; }
 function view() { if (state.route === "catalog") return catalogView(); if (state.route === "product") return productView(); if (state.route === "cart") return cartView(); if (state.route === "checkout") return checkoutView(); if (state.route === "success") return successView(); if (state.route === "terms") return termsView(); return homeView(); }
 
 function restoreScrollPosition(scrollY, { immediate = false } = {}) {
