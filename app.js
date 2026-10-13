@@ -96,6 +96,7 @@ const emptyFilterState = () => ({ size: [], season: [], gender: [], brand: [], m
 const state = { route: "home", section: "Кроссовки", filter: "Все", advancedFilters: { "Кроссовки": emptyFilterState(), "Одежда": emptyFilterState(), "Аксессуары": emptyFilterState() }, filterOpen: false, visibleCount: 18, selectedProduct: products.find((item) => item.article === "46419") || products[0], selectedSize: null, galleryIndex: 0, cart: [], checkoutStep: 1, checkout: { name: "", phone: "", city: "", comment: "", delivery: "pickup", pickup: "MSK2181" }, lastOrder: null };
 const meterMotion = { subtotal: null, discount: 0, progress: 0 };
 const app = document.querySelector("#app");
+const pageScrollTop = document.querySelector("#page-scroll-top");
 const toast = document.querySelector("#toast");
 const money = (value) => `${Math.round(value).toLocaleString("ru-RU")} ₽`;
 const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
@@ -297,7 +298,7 @@ function productCard(product, compact = false) {
 function catalogView() {
   const all = filteredProducts(); const visible = all.slice(0, state.visibleCount);
   const activeCount = activeFilterCount();
-  const catalogAction = state.visibleCount < all.length ? '<button class="load-more" id="load-more">Показать ещё</button>' : '<button class="load-more scroll-top-button" id="scroll-top">Вверх <span aria-hidden="true">↑</span></button>';
+  const catalogAction = state.visibleCount < all.length ? '<button class="load-more" id="load-more">Показать ещё</button>' : '';
   return `<div class="catalog-view content-width"><header class="catalog-title"><h1>${state.section}</h1><p>${sectionCounts[state.section]} товаров</p></header><div class="catalog-chips"><button class="filter-trigger ${activeCount ? "has-filters" : ""}" id="filter-open"><svg class="filter-trigger-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24A16,16,0,1,1,88,80,16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/></svg>Фильтры${activeCount ? `<b>${activeCount}</b>` : ""}</button>${["Все", "Мужские", "Женские", "Детские"].map((item) => `<button data-filter="${item}" class="${state.filter === item ? "active" : ""}">${item}</button>`).join("")}</div>${activeFilterBar()}${visible.length ? `<div class="product-grid">${visible.map((item) => productCard(item)).join("")}</div>${catalogAction}` : `<div class="catalog-empty"><b>Ничего не найдено</b><p>Попробуйте убрать один или несколько фильтров.</p><button id="empty-reset">Сбросить фильтры</button></div>`}</div>${filterDrawer()}`;
 }
 
@@ -531,7 +532,6 @@ function bindEvents() {
   document.querySelectorAll("[data-size]").forEach((node) => node.addEventListener("click", () => { state.selectedSize = node.dataset.size; render({ keepScroll: true }); }));
   document.querySelectorAll("[data-add]").forEach((node) => node.addEventListener("click", () => addToCart(node.dataset.add)));
   document.querySelector("#load-more")?.addEventListener("click", () => { state.visibleCount += 18; render({ keepScroll: true }); });
-  document.querySelector("#scroll-top")?.addEventListener("click", () => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
   document.querySelector("#clear-cart")?.addEventListener("click", () => { state.cart = []; saveCart(); render(); });
   document.querySelectorAll("[data-remove]").forEach((node) => node.addEventListener("click", () => { state.cart = state.cart.filter((item) => item.id !== node.dataset.remove); saveCart(); render({ keepScroll: true }); }));
   document.querySelectorAll("[data-qty]").forEach((node) => node.addEventListener("click", () => { const item = state.cart.find((row) => row.id === node.dataset.cartId); if (!item) return; item.quantity = Math.max(1, item.quantity + Number(node.dataset.qty)); saveCart(); render({ keepScroll: true }); }));
@@ -566,4 +566,8 @@ window.addEventListener("popstate", (event) => {
   render({ routeTransition: true });
 });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.filterOpen) { state.filterOpen = false; render({ keepScroll: true }); } });
+const updateScrollTopVisibility = () => pageScrollTop?.classList.toggle("visible", window.scrollY > 480);
+window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
+pageScrollTop?.addEventListener("click", () => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
 render({ restoreScroll: restoredInitialSnapshot?.scrollY || 0 });
+updateScrollTopVisibility();
