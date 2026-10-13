@@ -123,6 +123,13 @@ exit /b %errorlevel%
 :push_changes
 call :ensure_git
 if errorlevel 1 exit /b 1
+echo Синхронизация с GitHub...
+git pull --rebase origin main
+if errorlevel 1 (
+  echo Не удалось синхронизировать изменения с GitHub.
+  echo Проверьте сообщения Git выше и устраните конфликт перед повторной отправкой.
+  exit /b 1
+)
 git push -u origin main
 exit /b %errorlevel%
 
