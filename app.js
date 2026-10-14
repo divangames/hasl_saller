@@ -7,7 +7,7 @@ const makeProduct = (section, name, article, price, oldPrice, image, options = {
   image: image.startsWith("http") || image.startsWith(".") ? image : `${A}/${image}`,
   gender: options.gender || "Мужские",
   sizes: options.sizes || (section === "Одежда" ? [44, 46, 48, 50, 52, 54] : section === "Аксессуары" ? ["ONE"] : [41, 42, 43, 44, 45, 46]),
-  brand: options.brand || "OUTMAX", gallery: options.gallery,
+  brand: options.brand || "OUTMAX", gallery: options.gallery, stockBySize: options.stockBySize,
 });
 
 const sneakerSeeds = [
@@ -55,8 +55,40 @@ const accessorySeeds = [
   ["Гетры Nike", 43385, 2590, 5190, "nike-43385-1.jpg"], ["Гетры Nike", 43386, 2590, 5190, "nike-43386-1.jpg"],
 ].map(([name, article, price, oldPrice, file], index) => makeProduct("Аксессуары", name, article, price, oldPrice, imageUrl(article, file), { gender: index % 4 === 0 ? "Женские" : "Унисекс", sizes: name.startsWith("Варежки") ? [6, 7, 8, 9, 11, 12] : ["ONE"] }));
 
+// Apply official photo lists before creating demo copies so their galleries match.
+for (const product of [...sneakerSeeds, ...clothingSeeds, ...accessorySeeds]) {
+  const stock = window.OUTMAX_PRODUCT_STOCK?.products?.[product.article];
+  if (stock && Object.keys(stock).length) {
+    product.stockBySize = stock;
+    product.sizes = Object.keys(stock).sort((a, b) => a.localeCompare(b, "ru", { numeric: true }));
+  }
+  const photos = window.OUTMAX_PRODUCT_PHOTOS?.[product.article];
+  if (Array.isArray(photos) && photos.length) {
+    product.gallery = [...new Set(photos)];
+    product.image = product.gallery[0];
+  }
+}
+const extraProducts = [];
+const suppliedDetails = window.OUTMAX_PRODUCT_DETAILS?.products || {};
+for (const [article, details] of Object.entries(suppliedDetails)) {
+  if (!details.extra || !details.gallery?.length) continue;
+  extraProducts.push(makeProduct("Кроссовки", details.name, article, details.price, details.price, details.gallery[0]));
+}
+for (const product of [...sneakerSeeds, ...clothingSeeds, ...accessorySeeds, ...extraProducts]) {
+  const details = suppliedDetails[product.article];
+  product.gender = ({ "Мужской": "Мужские", "Женский": "Женские", "Детский": "Детские" })[details?.gender] || details?.gender || "Не указан";
+  if (!details) continue;
+  product.description = details.description;
+  product.specs = details.specs;
+  product.brand = details.brand || product.brand;
+  if (details.gallery?.length) { product.gallery = details.gallery; product.image = details.gallery[0]; }
+  if (Object.keys(details.stockBySize || {}).length) {
+    product.stockBySize = details.stockBySize;
+    product.sizes = Object.keys(details.stockBySize).sort((a, b) => a.localeCompare(b, "ru", { numeric: true }));
+  }
+}
 const duplicateSet = (list) => list.map((item, index) => ({ ...item, id: `${item.id}-test`, article: `${item.article}${index + 1}`, name: index % 4 === 0 ? `${item.name} — новая модель` : item.name }));
-const products = [...sneakerSeeds, ...duplicateSet(sneakerSeeds), ...clothingSeeds, ...duplicateSet(clothingSeeds), ...accessorySeeds, ...duplicateSet(accessorySeeds)];
+const products = [...sneakerSeeds, ...extraProducts, ...duplicateSet(sneakerSeeds), ...clothingSeeds, ...duplicateSet(clothingSeeds), ...accessorySeeds, ...duplicateSet(accessorySeeds)];
 const thresholds = [
   { sum: 3000, discount: 5, short: "3k" }, { sum: 6000, discount: 10, short: "6k" }, { sum: 8500, discount: 15, short: "8.5k" },
   { sum: 12000, discount: 20, short: "12k" }, { sum: 16000, discount: 25, short: "16k" }, { sum: 22000, discount: 30, short: "22k" },
@@ -93,7 +125,7 @@ const knownBrands = ["The North Face", "Under Armour", "Stone Island", "New Bala
 products.forEach((product) => { if (product.brand === "OUTMAX") product.brand = knownBrands.find((brand) => product.name.toLowerCase().includes(brand.toLowerCase())) || "ONE"; });
 
 const emptyFilterState = () => ({ size: [], season: [], gender: [], brand: [], model: [], category: [], item: [], kind: [] });
-const state = { route: "home", section: "Кроссовки", filter: "Все", advancedFilters: { "Кроссовки": emptyFilterState(), "Одежда": emptyFilterState(), "Аксессуары": emptyFilterState() }, filterOpen: false, visibleCount: 18, selectedProduct: products.find((item) => item.article === "46419") || products[0], selectedSize: null, galleryIndex: 0, cart: [], checkoutStep: 1, checkout: { name: "", phone: "", city: "", comment: "", delivery: "pickup", pickup: "MSK2181" }, lastOrder: null };
+const state = { route: "home", section: "Кроссовки", filter: "Все", advancedFilters: { "Кроссовки": emptyFilterState(), "Одежда": emptyFilterState(), "Аксессуары": emptyFilterState() }, filterOpen: false, visibleCount: 18, selectedProduct: products.find((item) => item.article === "46419") || products[0], selectedSize: null, galleryIndex: 0, cart: [], checkoutStep: 1, checkout: { name: "", phone: "", city: "", comment: "", delivery: "pickup", pickup: "", agreedToTerms: false }, lastOrder: null };
 const meterMotion = { subtotal: null, discount: 0, progress: 0 };
 const app = document.querySelector("#app");
 const pageScrollTop = document.querySelector("#page-scroll-top");
@@ -214,19 +246,33 @@ function quickSectionsNav(extraClass = "") {
 
 const navigationItems = [["home", "Главная", "6d1ae.svg", "91142.svg"], ["sneakers", "Кроссовки", "0f792.svg", "f2bb2.svg"], ["cart", "Корзина", "8b8e1.svg", "c6294.svg"], ["clothes", "Одежда", "14327.svg", "14327.svg"], ["terms", "Условия", "e5bc1.svg", "ab7d3.svg"]];
 const desktopNavigationItems = [navigationItems[0], navigationItems[1], navigationItems[3], navigationItems[4], navigationItems[2]];
+function cartPreview() {
+  const discount = discountInfo().discount;
+  return `<section class="cart-preview" aria-label="Содержимое корзины"><h2>Корзина · ${cartCount()}</h2>${state.cart.length ? `<ul>${state.cart.map(item => `<li><img src="${escapeHtml(item.product.image)}" alt="" /><div><strong>${escapeHtml(item.product.name)}</strong><span>Размер ${escapeHtml(item.size)} · ${item.quantity} шт.</span><b>${money(item.product.price * item.quantity * (1 - discount / 100))}</b></div></li>`).join("")}</ul><div class="cart-preview-total"><span>Итого · скидка ${discount}%</span><strong>${money(cartSubtotal() * (1 - discount / 100))}</strong></div><button class="red-button" data-route="cart">Перейти в корзину</button>` : '<p>В корзине пока нет товаров</p>'}</section>`;
+}
+function currentProductPrice(product) { return money(product.price * (1 - discountInfo().discount / 100)); }
+function priceDiscountNote() { return `<p class="price-discount-note">Цена с учётом скидки ${discountInfo().discount}%</p>`; }
+function sizeStockNote(product, size) {
+  if (size === null || size === undefined) return "";
+  const quantity = product.stockBySize?.[String(size)];
+  const known = Number.isInteger(quantity) && quantity >= 0;
+  return `<p class="size-stock-note" role="status">Размер ${escapeHtml(String(size))}: ${known ? `в наличии ${quantity} шт.` : 'количество уточняется'}</p>`;
+}
+const selectedCardSizes = new Map();
 function navigationButtons(items = navigationItems) {
   return items.map(([key, label, activeIcon, icon]) => {
     const active = key === state.route || (key === "sneakers" && state.route === "catalog" && state.section === "Кроссовки") || (key === "clothes" && state.route === "catalog" && state.section === "Одежда");
     const action = key === "sneakers" ? 'data-section="Кроссовки"' : key === "clothes" ? 'data-section="Одежда"' : `data-route="${key}"`;
     const glyph = key === "home" ? '<span class="home-menu-glyph" aria-hidden="true"></span>' : key === "sneakers" ? '<span class="sneaker-menu-glyph" aria-hidden="true"></span>' : key === "terms" ? '<span class="terms-menu-glyph" aria-hidden="true"></span>' : `<img src="${A}/${active ? activeIcon : icon}" alt="" />`;
     const accessibleLabel = key === "cart" ? `aria-label="Корзина, товаров: ${cartCount()}"` : "";
-    return `<button ${action} ${key === "cart" ? "data-cart-target" : ""} ${accessibleLabel} class="${active ? "active" : ""}" ${active ? 'aria-current="page"' : ""}><span class="nav-icon">${glyph}${key === "cart" && cartCount() ? `<i>${cartCount()}</i>` : ""}</span><small>${label}</small></button>`;
+    const button = `<button ${action} ${key === "cart" ? "data-cart-target" : ""} ${accessibleLabel} class="${active ? "active" : ""}" ${active ? 'aria-current="page"' : ""}><span class="nav-icon">${glyph}${key === "cart" && cartCount() ? `<i>${cartCount()}</i>` : ""}</span><small>${label}</small></button>`;
+    return key === "cart" && items === desktopNavigationItems ? `<div class="cart-preview-anchor">${button}${cartPreview()}</div>` : button;
   }).join("");
 }
 
 function header() {
   const discountHeader = ["home", "success"].includes(state.route) ? "" : `<div class="sticky-head"><div class="head-inner">${discountDashboard()}</div>${quickSectionsNav("head-inner")}</div>`;
-  return `${discountHeader}<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="На главную"><img src="${publicUrl("images/outmax_logo.svg")}" alt="Outmax" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopNavigationItems)}</nav></header>`;
+  return `<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="На главную"><img src="${publicUrl("images/outmax_logo.svg")}" alt="Outmax" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopNavigationItems)}</nav></header>${discountHeader}`;
 }
 
 function bottomNav() {
@@ -234,7 +280,7 @@ function bottomNav() {
 }
 
 function homeView() {
-  return `<div class="home-view"><button class="hero" data-route="terms"><img src="${publicUrl("images/banners/main_02.png")}" alt="Скидка до 50%" /><span class="hero-overlay"></span><span class="hero-copy"><b>Акция</b><strong>Скидка до 50%</strong><small>Чем выше сумма корзины — тем больше скидка.<br />Подробные условия внутри.</small></span></button><div class="home-filter-stack"><div class="home-filter-inner">${discountDashboard()}</div></div><section class="categories-section"><div class="section-title"><h2>Категории</h2></div><div class="category-grid"><button data-section="Кроссовки"><img src="${publicUrl("images/banners/sneakers_02.png?v=f3f9c50b")}" alt="Кроссовки" /><span><strong>Кроссовки</strong><small>2 000+</small></span></button><button data-section="Одежда"><img src="${publicUrl("images/banners/clothes_02.png?v=20261013c")}" alt="Одежда" /><span><strong>Одежда</strong><small>1 000+</small></span></button><button data-section="Аксессуары"><img src="${publicUrl("images/banners/other_02.png?v=20261013c")}" alt="Аксессуары" /><span><strong>Аксессуары</strong><small>500+</small></span></button></div>${saleTermsNote()}</section></div>`;
+  return `<div class="home-view"><section class="hero"><img src="${publicUrl("images/banners/main_02.png")}" alt="Скидка до 50%" /><span class="hero-overlay"></span><div class="hero-copy"><h1>Скидка до 50%</h1><small>Чем выше сумма корзины — тем больше скидка.<br />Подробные условия внутри.</small><button class="hero-cta" data-route="terms">Условия акции</button></div></section><div class="home-filter-stack"><div class="home-filter-inner">${discountDashboard()}</div></div><section class="categories-section"><div class="section-title"><h2>Категории</h2></div><div class="category-grid"><button data-section="Кроссовки"><img src="${publicUrl("images/banners/sneakers_02.png?v=f3f9c50b")}" alt="Кроссовки" /><span><strong>Кроссовки</strong><small>Более 1400 моделей</small></span></button><button data-section="Одежда"><img src="${publicUrl("images/banners/clothes_02.png?v=20261013c")}" alt="Одежда" /><span><strong>Одежда</strong><small>Более 900 наименований</small></span></button><button data-section="Аксессуары"><img src="${publicUrl("images/banners/other_02.png?v=20261013c")}" alt="Аксессуары" /><span><strong>Аксессуары</strong><small>Более 500 товаров</small></span></button></div>${saleTermsNote()}</section></div>`;
 }
 
 function normalizedGender(gender) { return ({ "Детские": "Детский", "Женские": "Женский", "Мужские": "Мужской" })[gender] || gender; }
@@ -282,17 +328,40 @@ function activeFilterBar() {
 function saleTermsNote() {
   return `<aside class="sale-note" aria-label="Краткие условия акции"><span class="sale-note-icon" aria-hidden="true">%</span><div><strong>Условия акции</strong><p>Добавляйте товары в корзину — чем выше сумма заказа, тем больше скидка. Сумма рассчитывается по ценам до скидки, а скидка применяется автоматически. Доставка платная и оплачивается на сайте, товары — при получении. Заказ выкупается только целиком. Возврат — по согласованию с интернет-магазином.</p></div><button data-route="terms">Подробнее<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></button></aside>`;
 }
-function shortProductName(name) {
-  if (name.length <= 24) return name;
-  const words = name.split(/\s+/).slice(0, 3).join(" ");
-  return `${words.length > 25 ? words.slice(0, 25).trimEnd() : words}…`;
-}
 const recentCardAdds = new Set();
+const shoeSizeCharts = {
+  "Женский": { 36: "22,5", 37: "23,5", 38: "24", 39: "25", 40: "25,5", 41: "26" },
+  "Мужской": { 40: "25", 41: "26", 42: "26,5", 43: "27,5", 44: "28", 45: "29", 46: "30" },
+};
+function shoeSizeChart(product) {
+  return product.section === "Кроссовки" ? shoeSizeCharts[normalizedGender(product.gender)] : null;
+}
+function sizeCentimeters(product, size) {
+  return shoeSizeChart(product)?.[size] || "";
+}
+function sizeChartDialog(product) {
+  const chart = shoeSizeChart(product);
+  if (!chart) return "";
+  const female = normalizedGender(product.gender) === "Женский";
+  return `<button type="button" class="size-chart-trigger" id="size-chart-open">Таблица размеров</button><dialog class="size-chart-dialog" id="size-chart-dialog" aria-labelledby="size-chart-title"><button type="button" id="size-chart-close" aria-label="Закрыть таблицу размеров">×</button><h2 id="size-chart-title">Размерная сетка</h2><p>Как выбрать размер:</p><ul><li>Измерить длину стопы и сопоставить со значением в таблице;</li><li>Узнать длину стопы по значению, указанному на язычке вашей обуви;</li><li>Учитывать наличие меха внутри зимней обуви.</li></ul><table><caption class="sr-only">${female ? "Женская" : "Мужская"} размерная сетка</caption><tbody><tr><th scope="row">EU</th>${Object.keys(chart).map(size => `<td>${size}</td>`).join("")}</tr><tr><th scope="row">СМ</th>${Object.values(chart).map(cm => `<td>${cm}</td>`).join("")}</tr></tbody></table><p class="size-chart-footnote">* длина вашей стопы</p><h3>Как правильно измерить длину стопы?</h3><img class="size-measure-guide" src="${publicUrl("images/size-measure-guide.png")}" alt="Обведите стопу, держа карандаш вертикально. Измерьте длину от середины пятки до большого пальца." /><p class="size-chart-warning">ВАЖНО измерить стопу и выбрать верный размер перед оформлением заказа, чтобы товар вам подошел.</p></dialog>`;
+}
+function productDescriptionMarkup(product) {
+  const text = product.description?.trim();
+  return `<section class="product-description"><h2>Описание</h2>${text ? text.split(/\n\s*\n/).filter(Boolean).map(paragraph => `<p>${escapeHtml(paragraph)}</p>`).join("") : '<p>Описание этого товара пока не предоставлено.</p>'}</section>`;
+}
+function productSpecsMarkup(product) {
+  const entries = Object.entries(product.specs || {}).filter(([key]) => ["Цвет", "Сезон", "Категория", "Модель", "Материал верха", "Пол"].includes(key));
+  return entries.length ? `<dl class="specs">${entries.map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>` : "";
+}
+function sizeLabel(product, size) {
+  const cm = sizeCentimeters(product, size);
+  return `<span>${escapeHtml(String(size))}</span>${cm ? `<small class="size-cm">${cm} см</small>` : ""}`;
+}
 const addedCheck = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8" /></svg>';
 function productCard(product, compact = false) {
   const discount = product.oldPrice > product.price ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
-  const sizes = product.sizes.map((size) => { const key = `${product.id}:${size}`; const added = recentCardAdds.has(key); return `<button type="button" class="card-size-button ${added ? "is-added" : ""}" data-card-product="${product.id}" data-card-size="${escapeHtml(String(size))}" aria-label="${added ? "Добавлено в корзину" : `Добавить размер ${escapeHtml(String(size))} в корзину`}" ${added ? "disabled" : ""}>${added ? addedCheck : escapeHtml(String(size))}</button>`; }).join("");
-  return `<article class="product-card ${compact ? "compact" : ""}"><button class="product-open" data-product="${product.id}" aria-label="Открыть ${escapeHtml(product.name)}"><span class="card-image"><img src="${product.image}" alt="${escapeHtml(product.name)}" loading="lazy" />${discount >= 45 ? `<i>−${discount}%</i>` : ""}</span><span class="card-info"><strong title="${escapeHtml(product.name)}">${escapeHtml(shortProductName(product.name))}</strong><small>Арт. ${product.article}</small></span></button><div class="card-buy"><span class="card-sizes"><em>Размеры</em><span class="card-size-list">${sizes}</span></span><span class="card-price"><b>${money(product.price)}</b>${product.oldPrice > product.price ? `<del>${money(product.oldPrice)}</del>` : ""}</span></div></article>`;
+  const sizes = product.sizes.map((size) => { const key = `${product.id}:${size}`; const added = recentCardAdds.has(key); return `<button type="button" class="card-size-button ${added ? "is-added" : ""}" data-card-product="${product.id}" data-card-size="${escapeHtml(String(size))}" aria-label="${added ? "Добавлено в корзину" : `Добавить размер ${escapeHtml(String(size))}${sizeCentimeters(product, size) ? `, ${sizeCentimeters(product, size)} см` : ""} в корзину`}" ${added ? "disabled" : ""}>${added ? addedCheck : sizeLabel(product, size)}</button>`; }).join("");
+  return `<article class="product-card ${compact ? "compact" : ""}"><button class="product-open" data-product="${product.id}" aria-label="Открыть ${escapeHtml(product.name)}"><span class="card-image"><img src="${product.image}" alt="${escapeHtml(product.name)}" loading="lazy" />${discount >= 45 ? `<i>−${discount}%</i>` : ""}</span><span class="card-info"><strong title="${escapeHtml(product.name)}">${escapeHtml(product.name)}</strong><small>Арт. ${product.article}</small></span></button><div class="card-buy"><span class="card-sizes"><em>Размеры</em><span class="card-size-list">${sizes}</span></span><span class="card-price"><b>${currentProductPrice(product)}</b>${product.oldPrice > product.price ? `<del>${money(product.oldPrice)}</del>` : ""}</span>${priceDiscountNote()}${sizeStockNote(product, selectedCardSizes.get(product.id))}</div></article>`;
 }
 
 function catalogView() {
@@ -302,26 +371,25 @@ function catalogView() {
   return `<div class="catalog-view content-width"><header class="catalog-title"><h1>${state.section}</h1><p>${sectionCounts[state.section]} товаров</p></header><div class="catalog-chips"><button class="filter-trigger ${activeCount ? "has-filters" : ""}" id="filter-open"><svg class="filter-trigger-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24A16,16,0,1,1,88,80,16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/></svg>Фильтры${activeCount ? `<b>${activeCount}</b>` : ""}</button>${["Все", "Мужские", "Женские", "Детские"].map((item) => `<button data-filter="${item}" class="${state.filter === item ? "active" : ""}">${item}</button>`).join("")}</div>${activeFilterBar()}${visible.length ? `<div class="product-grid">${visible.map((item) => productCard(item)).join("")}</div>${catalogAction}` : `<div class="catalog-empty"><b>Ничего не найдено</b><p>Попробуйте убрать один или несколько фильтров.</p><button id="empty-reset">Сбросить фильтры</button></div>`}</div>${filterDrawer()}`;
 }
 
-const productDescription = `Товары представленные на сайте являются качественной репликой (категория ААА+) Реплика категорий ААА+ это высокое качество, и долгий срок службы Высокие ботинки – это универсальный выбор для городских прогулок и активного отдыха. Они подойдут для холодной и дождливой погоды Характеристики Высоких ботинок:— Классическая шнуровка удобная фиксация стопы и индивидуальная посадка для любого типа ноги— Верх из текстиля и прессованной кожи легкие и прочные материалы для долгого срока службы— Защита в носке и пяточной зоне предотвращает повреждения и сохраняет форму ботинка— Высокая резиновая подошва амортизация и поддержка на любых поверхностях, комфорт при долгой носке— Глубокий протектор надёжное сцепление с мокрой и скользкой дорогой, уверенность в каждом шаге С чем носить Высокие ботинки:— Горпкор: карго-брюки, утеплённые куртки, флисовые свитшоты— Кэжуал: джинсы, базовые толстовки, джинсовые или кожаные куртки классическая шнуровка; верх из текстиля и прессованной кожи; защита в носке и пяточной зоне; высокая резиновая подошва; глубокий протектор.`;
 function productView() {
   const p = state.selectedProduct; const gallery = p.gallery || [p.image]; const related = products.filter((item) => item.section === p.section && item.id !== p.id).slice(0, 4);
-  return `<div class="product-view content-width"><button class="product-back" id="product-back" aria-label="Назад"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6" /></svg></button><div class="product-layout"><section class="gallery-panel"><div class="gallery-main"><img src="${gallery[state.galleryIndex] || gallery[0]}" alt="${escapeHtml(p.name)}" /></div>${gallery.length > 1 ? `<div class="thumbs">${gallery.map((src, index) => `<button data-gallery="${index}" class="${index === state.galleryIndex ? "active" : ""}"><img src="${src}" alt="Фото ${index + 1}" /></button>`).join("")}</div>` : ""}</section><section class="product-details"><p class="product-brand">${escapeHtml(p.brand)}</p><h1>${escapeHtml(p.name)}</h1><p class="product-article">Артикул ${p.article}</p><div class="product-price"><strong>${money(p.price)}</strong>${p.oldPrice > p.price ? `<del>${money(p.oldPrice)}</del>` : ""}</div><h2>Размер (EU) <span>— выберите</span></h2><div class="sizes">${p.sizes.map((size) => `<button data-size="${size}" class="${String(state.selectedSize) === String(size) ? "active" : ""}">${size}</button>`).join("")}</div><button class="red-button add-button" data-add="${p.id}">В корзину</button><dl class="specs"><div><dt>Цвет</dt><dd>Камуфляж</dd></div><div><dt>Сезон</dt><dd>Демисезон</dd></div><div><dt>Категория</dt><dd>${p.section === "Кроссовки" ? "Ботинки" : p.section}</dd></div><div><dt>Модель</dt><dd>${escapeHtml(p.name.split(" ")[0])}</dd></div><div><dt>Бренд</dt><dd>${escapeHtml(p.brand === "SNEAKERS" ? "ONE" : p.brand)}</dd></div></dl><p class="long-description">${productDescription}</p></section></div><section class="related"><h2>Смотрите также</h2><div>${related.map((item) => productCard(item, true)).join("")}</div></section></div>`;
+  return `<div class="product-view content-width"><button class="product-back" id="product-back" aria-label="Назад"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6" /></svg></button><div class="product-layout"><section class="gallery-panel"><div class="gallery-main"><img src="${gallery[state.galleryIndex] || gallery[0]}" alt="${escapeHtml(p.name)}" /></div>${gallery.length > 1 ? `<div class="thumbs">${gallery.map((src, index) => `<button data-gallery="${index}" class="${index === state.galleryIndex ? "active" : ""}"><img src="${src}" alt="Фото ${index + 1}" /></button>`).join("")}</div>` : ""}</section><section class="product-details"><p class="product-brand">${escapeHtml(p.brand)}</p><h1>${escapeHtml(p.name)}</h1><p class="product-article">Артикул ${p.article}</p><div class="product-price"><strong>${currentProductPrice(p)}</strong>${p.oldPrice > p.price ? `<del>${money(p.oldPrice)}</del>` : ""}</div>${priceDiscountNote()}<h2 class="size-heading">${p.section === "Кроссовки" ? `Размер (европейский) <span class="size-help"><button type="button" class="size-help-trigger" aria-label="Подсказка по размерам" aria-expanded="false" aria-controls="size-help-text">i</button><span class="size-help-text" id="size-help-text" role="tooltip">Европейские размеры маломерят относительно российских. Для точного выбора ориентируйтесь на замеры в см.</span></span>` : "Размер"} <span>— выберите</span></h2>${sizeChartDialog(p)}<div class="sizes">${p.sizes.map((size) => `<button data-size="${size}" aria-pressed="${String(state.selectedSize) === String(size)}" class="${String(state.selectedSize) === String(size) ? "active" : ""}">${sizeLabel(p, size)}</button>`).join("")}</div>${sizeStockNote(p, state.selectedSize)}<button class="red-button add-button" data-add="${p.id}">В корзину</button>${productSpecsMarkup(p)}${productDescriptionMarkup(p)}</section></div><section class="related"><h2>Смотрите также</h2><div>${related.map((item) => productCard(item, true)).join("")}</div></section></div>`;
 }
 
 function cartView() {
   const subtotal = cartSubtotal(); const info = discountInfo(subtotal); const discountValue = Math.round(subtotal * info.discount / 100); const total = subtotal - discountValue;
   if (!state.cart.length) return `<div class="cart-view content-width"><div class="empty-card"><h1>Корзина пуста</h1><button class="red-button" data-section="Кроссовки">В каталог</button></div></div>`;
   const next = info.next ? `Добавьте ещё на <strong>${money(info.next.sum - subtotal)}</strong> — скидка станет ${info.next.discount}%` : "Максимальная скидка уже ваша";
-  return `<div class="cart-view content-width"><div class="cart-head"><h1>Корзина</h1><button id="clear-cart">♲&nbsp; Очистить</button></div><div class="cart-layout"><div class="cart-left"><div class="cart-next">${next}</div><div class="cart-list">${state.cart.map((item) => `<article class="cart-item"><img src="${item.product.image}" alt="${escapeHtml(item.product.name)}" /><div class="cart-copy"><h2>${escapeHtml(item.product.name)}</h2><p>Размер ${item.size}</p><small>Арт. ${item.product.article}</small><strong>${money(item.product.price)}</strong><span>${money(item.product.price * item.quantity)}</span></div><button class="cart-remove" data-remove="${item.id}" aria-label="Удалить">×</button><div class="quantity"><button data-qty="-1" data-cart-id="${item.id}">−</button><b>${item.quantity}</b><button data-qty="1" data-cart-id="${item.id}">＋</button></div></article>`).join("")}</div></div><aside class="order-card"><div><span>Сумма</span><b>${money(subtotal)}</b></div><div class="green"><span>Скидка ${info.discount}%</span><b>−${money(discountValue)}</b></div><hr /><div class="order-total"><span>Итого</span><strong>${money(total)}</strong></div><button class="red-button" id="checkout-button">Оформить заявку</button></aside></div></div>`;
+  return `<div class="cart-view content-width"><div class="cart-head"><h1>Корзина</h1><button id="clear-cart">♲&nbsp; Очистить</button></div><div class="cart-layout"><div class="cart-left"><div class="cart-next">${next}</div><div class="cart-list">${state.cart.map((item) => `<article class="cart-item"><img src="${item.product.image}" alt="${escapeHtml(item.product.name)}" /><div class="cart-copy"><h2>${escapeHtml(item.product.name)}</h2><p>Размер ${item.size}</p><small>Арт. ${item.product.article}</small><strong class="cart-discounted-price">${currentProductPrice(item.product)}</strong><small class="green">Цена со скидкой ${info.discount}%</small><span>${money(item.product.price * item.quantity * (1 - info.discount / 100))}</span></div><button class="cart-remove" data-remove="${item.id}" aria-label="Удалить">×</button><div class="quantity"><button aria-label="Уменьшить количество" data-qty="-1" data-cart-id="${item.id}">−</button><b>${item.quantity}</b><button aria-label="Увеличить количество" data-qty="1" data-cart-id="${item.id}">＋</button></div></article>`).join("")}</div></div><aside class="order-card"><div><span>Сумма</span><b>${money(subtotal)}</b></div><div class="green"><span>Скидка ${info.discount}%</span><b>−${money(discountValue)}</b></div><hr /><div class="order-total"><span>Итого</span><strong>${money(total)}</strong></div><button class="red-button" id="checkout-button">Оформить заявку</button></aside></div></div>`;
 }
 
 const deliveryOptions = [{ id: "pickup", title: "СДЭК - до ПВЗ, 500 руб.", price: 500 }, { id: "courier", title: "СДЭК - курьером, 920 руб.", price: 920 }, { id: "post", title: "Почта России, 610 руб.", price: 610 }, { id: "postamat", title: "Почта России (постамат), 640 руб.", price: 640 }];
 function orderAmounts(deliveryId = state.checkout.delivery) { const subtotal = cartSubtotal(); const info = discountInfo(subtotal); const discountValue = Math.round(subtotal * info.discount / 100); const delivery = state.checkoutStep === 2 ? deliveryOptions.find((item) => item.id === deliveryId)?.price || 0 : 0; return { subtotal, discount: info.discount, discountValue, delivery, total: subtotal - discountValue + delivery }; }
 function checkoutSummary() { const amount = orderAmounts(); return `<aside class="checkout-summary"><div><span>Товаров</span><b>${cartCount()}</b></div><div><span>Сумма</span><b>${money(amount.subtotal)}</b></div><div class="green"><span>Скидка ${amount.discount}%</span><b>−${money(amount.discountValue)}</b></div>${state.checkoutStep === 2 ? `<div><span>Доставка</span><b>${money(amount.delivery)}</b></div>` : ""}<hr /><div class="summary-total"><span>Итого</span><strong>${money(amount.total)}</strong></div></aside>`; }
-function checkoutDataStep() { const c = state.checkout; return `<form id="checkout-data-form" class="checkout-form" novalidate><label>Имя *<input name="name" required value="${escapeHtml(c.name)}" placeholder="Как к вам обращаться" /></label><label>Телефон *<input name="phone" required value="${escapeHtml(c.phone)}" placeholder="+7 (999) 999-99-99" inputmode="tel" /></label><label>Город *<input name="city" required value="${escapeHtml(c.city)}" placeholder="Начните вводить город" /><small>Выберите город из списка — нужен для расчёта доставки</small></label><label>Комментарий<textarea name="comment" rows="4" placeholder="Пожелания к заказу">${escapeHtml(c.comment)}</textarea></label><p id="form-error" class="form-error" role="alert"></p><button class="red-button" type="submit">Далее — доставка</button></form>`; }
+function checkoutDataStep() { const c = state.checkout; return `<form id="checkout-data-form" class="checkout-form" novalidate><label>ФИО *<input name="name" autocomplete="name" required value="${escapeHtml(c.name)}" placeholder="Иванов Иван Иванович" /></label><label>Телефон *<input name="phone" type="tel" autocomplete="tel" required value="${escapeHtml(c.phone)}" placeholder="+7 (999) 999-99-99" inputmode="tel" /></label><div class="city-field"><label for="checkout-city">Город *</label><input id="checkout-city" name="city" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="city-options" aria-describedby="city-status" required value="${escapeHtml(c.city)}" placeholder="Начните вводить город" /><ul id="city-options" class="city-options" role="listbox" aria-label="Города России" hidden></ul><small id="city-status" role="status">Введите минимум 2 буквы. Если города нет в списке, укажите его вручную.</small></div><label>Комментарий<textarea name="comment" rows="4" placeholder="Пожелания к заказу">${escapeHtml(c.comment)}</textarea></label><label class="terms-consent"><input type="checkbox" name="agreedToTerms" required ${c.agreedToTerms ? "checked" : ""} /><span>Я ознакомился с <a href="https://outmaxshop.ru/privacy" target="_blank" rel="noopener noreferrer">условиями акции</a></span></label><p id="form-error" class="form-error" role="alert"></p><button class="red-button" type="submit">Далее — доставка</button></form>`; }
 function checkoutDeliveryStep() {
   const c = state.checkout; const points = [["MSK2181", "1-й Ботанический пр-д, 5", "Пн–Пт 10:00–21:00, Сб–Вс 10:00–20:00"], ["MSK2501", "1-й Грайвороновский пр-д, 7А к.3", "Пн–Вс 10:00–22:00 · постамат"], ["MSK2264", "1-й Котляковский пер., 2Ак3В", "Пн–Пт 10:00–21:00, Сб–Вс 10:00–20:00"]];
-  return `<div class="delivery-step"><div class="customer-card"><p>${escapeHtml(c.name)}, ${escapeHtml(c.phone)}</p><p>${escapeHtml(c.city)}, индекс 101000</p></div><h2>Способ доставки</h2><div class="delivery-list">${deliveryOptions.map((item) => `<label class="delivery-option ${c.delivery === item.id ? "selected" : ""}"><input type="radio" name="delivery" value="${item.id}" ${c.delivery === item.id ? "checked" : ""} /><i></i><span>${item.title}</span></label>`).join("")}</div>${c.delivery === "pickup" ? `<div class="pickup-list"><h2>Пункт выдачи СДЭК</h2><input class="pickup-search" placeholder="Поиск по адресу" />${points.map(([id, title, note]) => `<label><input type="radio" name="pickup" value="${id}" ${c.pickup === id ? "checked" : ""} /><span><b>${title}</b><small>${note} · ${id}</small></span></label>`).join("")}</div>` : ""}<div class="checkout-actions"><button class="outline-button" id="checkout-back">Назад</button><button class="red-button" id="checkout-submit">Отправить заявку</button></div></div>`;
+  return `<div class="delivery-step"><div class="customer-card"><p>${escapeHtml(c.name)}, ${escapeHtml(c.phone)}</p><p>${escapeHtml(c.city)}, индекс 101000</p></div><h2>Способ доставки</h2><div class="delivery-list">${deliveryOptions.map((item) => `<label class="delivery-option ${c.delivery === item.id ? "selected" : ""}"><input type="radio" name="delivery" value="${item.id}" ${c.delivery === item.id ? "checked" : ""} /><i></i><span>${item.title}</span></label>`).join("")}</div>${c.delivery === "pickup" ? `<div class="pickup-list"><h2>Пункт выдачи СДЭК</h2><p class="pickup-hint" id="pickup-hint">${c.pickup ? "Пункт выдачи выбран. При необходимости выберите другой." : "Выберите пункт выдачи СДЭК из списка, чтобы отправить заявку."}</p><input class="pickup-search" placeholder="Поиск по адресу" />${points.map(([id, title, note]) => `<label><input type="radio" name="pickup" value="${id}" ${c.pickup === id ? "checked" : ""} /><span><b>${title}</b><small>${note} · ${id}</small></span></label>`).join("")}</div>` : ""}<p id="delivery-error" class="form-error" role="alert" tabindex="-1"></p><div class="checkout-actions"><button class="outline-button" id="checkout-back">Назад</button><button class="red-button" id="checkout-submit">Отправить заявку</button></div></div>`;
 }
 function checkoutView() { if (!state.cart.length) return `<div class="checkout-view content-width"><div class="empty-card"><h1>Корзина пуста</h1><button class="red-button" data-section="Кроссовки">В каталог</button></div></div>`; return `<div class="checkout-view content-width"><h1>Оформление</h1><div class="checkout-tabs"><button class="${state.checkoutStep === 1 ? "active" : ""}" data-checkout-step="1">1. Данные</button><button class="${state.checkoutStep === 2 ? "active" : ""}" data-checkout-step="2">2. Доставка</button></div><div class="checkout-layout">${checkoutSummary()}<section class="checkout-main">${state.checkoutStep === 1 ? checkoutDataStep() : checkoutDeliveryStep()}</section></div></div>`; }
 function successView() { const order = state.lastOrder || { number: "OM-2026-0000" }; return `<div class="success-view content-width"><section class="success-card" aria-labelledby="success-title"><span class="success-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m13 25 7 7 15-17" /></svg></span><p class="success-order">Заявка ${escapeHtml(order.number)}</p><h1 id="success-title"><span>Спасибо!</span>Ваша заявка принята</h1><p class="success-message">В ближайшее время наш менеджер позвонит вам с номера <a href="tel:+73912029868">+7 (391) 202-98-68</a>, уточнит детали и поможет завершить оформление заказа.</p><p class="success-hours"><strong>Рабочее время:</strong> с 7:00 до 19:00 (МСК).</p><button class="red-button" data-section="Кроссовки">В каталог</button></section></div>`; }
@@ -484,17 +552,36 @@ function addCardSize(button) {
   if (recentCardAdds.has(key)) return;
   const flight = createCartFlyer(image);
   recentCardAdds.add(key);
+  selectedCardSizes.set(product.id, size);
   putCartItem(product, size);
   render({ keepScroll: true });
   requestAnimationFrame(() => flyToCart(flight));
   showToast(`Размер ${size} добавлен в корзину`);
   setTimeout(() => {
     recentCardAdds.delete(key);
-    [...document.querySelectorAll("[data-card-product]")].filter((node) => node.dataset.cardProduct === product.id && node.dataset.cardSize === size).forEach((node) => { node.classList.remove("is-added"); node.disabled = false; node.textContent = size; node.setAttribute("aria-label", `Добавить размер ${size} в корзину`); });
+    [...document.querySelectorAll("[data-card-product]")].filter((node) => node.dataset.cardProduct === product.id && node.dataset.cardSize === size).forEach((node) => { node.classList.remove("is-added"); node.disabled = false; node.innerHTML = sizeLabel(product, size); node.setAttribute("aria-label", `Добавить размер ${size}${sizeCentimeters(product, size) ? `, ${sizeCentimeters(product, size)} см` : ""} в корзину`); });
   }, 1150);
 }
 
 function bindEvents() {
+  const sizeHelp = document.querySelector(".size-help-trigger");
+  sizeHelp?.addEventListener("click", () => {
+    const open = sizeHelp.getAttribute("aria-expanded") !== "true";
+    sizeHelp.setAttribute("aria-expanded", String(open));
+    sizeHelp.closest(".size-help").classList.toggle("is-open", open);
+  });
+  sizeHelp?.addEventListener("keydown", event => {
+    if (event.key === "Escape") { sizeHelp.setAttribute("aria-expanded", "false"); sizeHelp.closest(".size-help").classList.remove("is-open"); sizeHelp.blur(); }
+  });
+  const sizeDialog = document.querySelector("#size-chart-dialog");
+  const sizeTrigger = document.querySelector("#size-chart-open");
+  sizeTrigger?.addEventListener("click", () => { sizeDialog.showModal(); document.body.classList.add("size-chart-open"); });
+  document.querySelector("#size-chart-close")?.addEventListener("click", () => sizeDialog.close());
+  sizeDialog?.addEventListener("close", () => { document.body.classList.remove("size-chart-open"); sizeTrigger.focus({ preventScroll: true }); });
+  sizeDialog?.addEventListener("click", (event) => {
+    const box = sizeDialog.getBoundingClientRect();
+    if (event.target === sizeDialog && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) sizeDialog.close();
+  });
   document.querySelectorAll("[data-route]").forEach((node) => node.addEventListener("click", () => navigate(node.dataset.route)));
   document.querySelectorAll("[data-section]").forEach((node) => node.addEventListener("click", () => navigate("catalog", { beforeEnter: () => { state.section = node.dataset.section; state.filter = "Все"; state.filterOpen = false; state.visibleCount = 18; } })));
   const quickTabs = [...document.querySelectorAll(".quick-tab")];
@@ -509,7 +596,7 @@ function bindEvents() {
   }));
   document.querySelectorAll("[data-filter]").forEach((node) => node.addEventListener("click", () => { state.filter = node.dataset.filter; state.advancedFilters[state.section].gender = []; state.visibleCount = 18; render(); }));
   document.querySelector("#filter-open")?.addEventListener("click", () => { state.filterOpen = true; render({ keepScroll: true }); requestAnimationFrame(() => document.querySelector("#filter-close")?.focus()); });
-  const closeFilters = () => { state.filterOpen = false; state.visibleCount = 18; render({ keepScroll: true }); };
+  const closeFilters = () => { state.filterOpen = false; state.visibleCount = 18; render({ keepScroll: true }); document.querySelector("#filter-open")?.focus({ preventScroll: true }); };
   document.querySelector("#filter-close")?.addEventListener("click", closeFilters);
   document.querySelector("#filter-backdrop")?.addEventListener("click", closeFilters);
   document.querySelector("#filter-apply")?.addEventListener("click", closeFilters);
@@ -543,12 +630,27 @@ function bindEvents() {
   document.querySelectorAll("[data-remove]").forEach((node) => node.addEventListener("click", () => { state.cart = state.cart.filter((item) => item.id !== node.dataset.remove); saveCart(); render({ keepScroll: true }); }));
   document.querySelectorAll("[data-qty]").forEach((node) => node.addEventListener("click", () => { const item = state.cart.find((row) => row.id === node.dataset.cartId); if (!item) return; item.quantity = Math.max(1, item.quantity + Number(node.dataset.qty)); saveCart(); render({ keepScroll: true }); }));
   document.querySelector("#checkout-button")?.addEventListener("click", () => navigate("checkout", { beforeEnter: () => { state.checkoutStep = 1; } }));
-  document.querySelectorAll("[data-checkout-step]").forEach((node) => node.addEventListener("click", () => { const step = Number(node.dataset.checkoutStep); if (step === 1 || state.checkout.name) { state.checkoutStep = step; render(); } }));
-  document.querySelector("#checkout-data-form")?.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.checkout = { ...state.checkout, name: String(data.get("name") || "").trim(), phone: String(data.get("phone") || "").trim(), city: String(data.get("city") || "").trim(), comment: String(data.get("comment") || "").trim() }; if (!state.checkout.name || !state.checkout.phone || !state.checkout.city) { document.querySelector("#form-error").textContent = "Заполните имя, телефон и город."; return; } state.checkoutStep = 2; render(); });
+  document.querySelectorAll("[data-checkout-step]").forEach((node) => node.addEventListener("click", () => {
+    const step = Number(node.dataset.checkoutStep);
+    if (step === state.checkoutStep) return;
+    if (step === 2) { document.querySelector("#checkout-data-form")?.requestSubmit(); return; }
+    state.checkoutStep = 1; render();
+  }));
+  window.bindCitySuggestions?.();
+  document.querySelector("#checkout-data-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const city = String(data.get("city") || "").trim();
+    state.checkout = { ...state.checkout, name: String(data.get("name") || "").trim(), phone: String(data.get("phone") || "").trim(), city, comment: String(data.get("comment") || "").trim(), pickup: city === state.checkout.city ? state.checkout.pickup : "", agreedToTerms: data.get("agreedToTerms") === "on" };
+    const error = document.querySelector("#form-error");
+    if (!state.checkout.name || !state.checkout.phone || !state.checkout.city) { error.textContent = "Заполните ФИО, телефон и город."; return; }
+    if (!state.checkout.agreedToTerms) { error.textContent = "Подтвердите, что ознакомились с условиями акции."; document.querySelector('[name="agreedToTerms"]').focus(); return; }
+    state.checkoutStep = 2; render();
+  });
   document.querySelectorAll('input[name="delivery"]').forEach((node) => node.addEventListener("change", () => { state.checkout.delivery = node.value; render({ keepScroll: true }); }));
   document.querySelectorAll('input[name="pickup"]').forEach((node) => node.addEventListener("change", () => { state.checkout.pickup = node.value; render({ keepScroll: true }); }));
   document.querySelector("#checkout-back")?.addEventListener("click", () => { state.checkoutStep = 1; render(); });
-  document.querySelector("#checkout-submit")?.addEventListener("click", async (event) => { const button = event.currentTarget; const amounts = orderAmounts(); const selected = deliveryOptions.find((item) => item.id === state.checkout.delivery); button.disabled = true; button.textContent = "Отправляем…"; try { await sendOrderToTelegram({ customer: state.checkout, delivery: selected, amounts, items: state.cart.map((item) => ({ name: item.product.name, article: item.product.article, size: item.size, quantity: item.quantity, lineTotal: item.product.price * item.quantity })) }); } catch { button.disabled = false; button.textContent = "Отправить заявку"; showToast("Не удалось отправить заявку. Проверьте TG BOT.txt и подключение."); return; } const order = { number: `OM-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`, total: amounts.total }; navigate("success", { beforeEnter: () => { state.lastOrder = order; state.cart = []; saveCart(); } }); });
+  document.querySelector("#checkout-submit")?.addEventListener("click", async (event) => { const button = event.currentTarget; if (!state.checkout.agreedToTerms) { state.checkoutStep = 1; render(); document.querySelector("#form-error").textContent = "Подтвердите, что ознакомились с условиями акции."; document.querySelector('[name="agreedToTerms"]')?.focus(); return; } if (state.checkout.delivery === "pickup" && !state.checkout.pickup) { const error = document.querySelector("#delivery-error"); error.textContent = "Не выбран ПВЗ СДЭК. Выберите пункт выдачи из списка выше."; error.focus(); return; } const amounts = orderAmounts(); const selected = deliveryOptions.find((item) => item.id === state.checkout.delivery); button.disabled = true; button.textContent = "Отправляем…"; try { await sendOrderToTelegram({ customer: state.checkout, delivery: selected, amounts, items: state.cart.map((item) => ({ name: item.product.name, article: item.product.article, size: item.size, quantity: item.quantity, lineTotal: item.product.price * item.quantity })) }); } catch { button.disabled = false; button.textContent = "Отправить заявку"; showToast("Не удалось отправить заявку. Проверьте TG BOT.txt и подключение."); return; } const order = { number: `OM-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`, total: amounts.total }; navigate("success", { beforeEnter: () => { state.lastOrder = order; state.cart = []; saveCart(); } }); });
 }
 
 restoreCart();
@@ -572,7 +674,22 @@ window.addEventListener("popstate", (event) => {
   if (locationState.productId) state.selectedProduct = products.find((item) => item.article === locationState.productId || item.id === locationState.productId) || state.selectedProduct;
   render({ routeTransition: true });
 });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.filterOpen) { state.filterOpen = false; render({ keepScroll: true }); } });
+document.addEventListener("keydown", (event) => {
+  if (!state.filterOpen) return;
+  if (event.key === "Escape") {
+    document.querySelector("#filter-close")?.click();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const controls = [...document.querySelectorAll('.filter-drawer button:not(:disabled), .filter-drawer input, .filter-drawer summary')].filter((node) => node.getClientRects().length && !node.hidden);
+  const first = controls[0];
+  const last = controls[controls.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement))) {
+    event.preventDefault(); last?.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !controls.includes(document.activeElement))) {
+    event.preventDefault(); first?.focus();
+  }
+});
 const updateScrollTopVisibility = () => pageScrollTop?.classList.toggle("visible", window.scrollY > 480);
 window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
 pageScrollTop?.addEventListener("click", () => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
