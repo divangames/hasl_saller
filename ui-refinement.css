@@ -23,7 +23,10 @@ body { line-height: 1.5; }
 .cart-item { min-height: 205px; }
 .size-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .size-help { position: relative; display: inline-flex; }
-.size-help-trigger { width: 44px; height: 44px; padding: 0; border-radius: 50%; background: transparent; color: #555; font-family: Georgia, serif; font-size: 20px; }
+.size-help-trigger { display: grid; width: 44px; height: 44px; padding: 0; place-items: center; border-radius: 50%; background: transparent; color: transparent; font-size: 0; }
+.size-help-trigger::before { display: grid; width: 22px; height: 22px; place-items: center; border: 1.5px solid #555; border-radius: 50%; color: #555; content: "i"; font-family: Georgia, serif; font-size: 15px; font-weight: 700; line-height: 1; }
+.success-phone-break { display: none; }
+.success-phone { white-space: nowrap; }
 .size-help-text { display: none; position: absolute; bottom: calc(100% + 4px); right: 0; z-index: 85; width: min(280px, 75vw); padding: 12px 14px; border-radius: 8px; background: #242424; color: white !important; font-size: 13px; font-weight: 400; line-height: 1.5; box-shadow: 0 8px 24px #0002; }
 .size-help.is-open .size-help-text, .size-help:focus-within .size-help-text { display: block; }
 @media (hover: hover) and (pointer: fine) { .size-help:hover .size-help-text { display: block; } }
@@ -174,6 +177,7 @@ button:disabled { cursor: not-allowed; }
   .card-size-button:hover { background: #222; color: white; }
 }
 @media (min-width: 768px) {
+  .success-phone-break { display: block; }
   .route-home .hero-copy { bottom: 76px; }
   .order-card { position: sticky; top: 205px; }
   .terms-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
