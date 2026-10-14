@@ -2,5 +2,7 @@ TG BOT.txt
 .playwright-mcp/
 artifacts/
 .taste-skill/
+.impeccable/review/
+_site/
 Thumbs.db
 .DS_Store

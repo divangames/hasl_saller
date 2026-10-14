@@ -1,7 +1,7 @@
 const scriptUrl = document.currentScript?.src || new URL("./app.js", location.href).href;
 const publicUrl = (path) => new URL(String(path).replace(/^\.\//, ""), new URL(".", scriptUrl)).href;
 const A = publicUrl("assets/figma");
-const TERMS_URL = "/terms";
+const TERMS_URL = new URL("./#terms", scriptUrl).href;
 const imageUrl = (article, file) => `https://outmaxshop.ru/components/com_jshopping/files/img_products/${article}/${file}`;
 const makeProduct = (section, name, article, price, oldPrice, image, options = {}) => ({
   id: String(article), section, name, article: String(article), price, oldPrice: oldPrice || price,
@@ -205,7 +205,7 @@ async function sendOrderToTelegram(order) {
   const token = config.match(/^\s*Token\s*:\s*(\S+)\s*$/im)?.[1];
   const chatId = config.match(/^\s*Id\s*:\s*(-?\d+)\s*$/im)?.[1];
   if (!token || !chatId) throw new Error("Telegram config is invalid");
-  const lines = ["🛍 Новая тестовая заявка OUTMAX SALE", "", `Имя: ${order.customer.name || "—"}`, `Телефон: ${order.customer.phone || "—"}`, `Город: ${order.customer.city || "—"}`];
+  const lines = ["Новая тестовая заявка ХАСЛ", "", `Имя: ${order.customer.name || "—"}`, `Телефон: ${order.customer.phone || "—"}`, `Город: ${order.customer.city || "—"}`];
   if (order.customer.comment) lines.push(`Комментарий: ${order.customer.comment}`);
   lines.push("", "Товары:");
   order.items.forEach((item) => lines.push(`• ${item.name} · размер ${item.size} · ${item.quantity} шт. · ${money(item.lineTotal)}`));
@@ -280,7 +280,7 @@ function navigationButtons(items = navigationItems) {
 
 function header() {
   const discountHeader = ["home", "success"].includes(state.route) ? "" : `<div class="sticky-head"><div class="head-inner">${discountDashboard()}</div>${quickSectionsNav("head-inner")}</div>`;
-  return `<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="На главную"><img src="${publicUrl("images/outmax_logo.svg")}" alt="Outmax" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopNavigationItems)}</nav></header>${discountHeader}`;
+  return `<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="ХАСЛ — на главную"><img src="${publicUrl("images/hasle_logo.svg")}" alt="ХАСЛ" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopNavigationItems)}</nav></header>${discountHeader}`;
 }
 
 function bottomNav() {

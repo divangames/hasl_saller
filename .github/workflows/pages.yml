@@ -1,4 +1,4 @@
-name: Deploy OUTMAX SALE to GitHub Pages
+name: Deploy HASL to GitHub Pages
 
 on:
   push:
@@ -25,10 +25,15 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure Pages
         uses: actions/configure-pages@v5
+      - name: Prepare public files
+        run: |
+          mkdir -p _site
+          cp index.html app.js styles.css ui-refinement.css hasl-theme.css product-*.js russian-cities.js city-suggestions.js _site/
+          cp -r images assets _site/
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
