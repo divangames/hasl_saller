@@ -23,6 +23,19 @@ button, input, textarea, select { font-family: inherit; }
 html { scrollbar-color: #111 #eee; }
 input, textarea { caret-color: #111; accent-color: #111; }
 :focus-visible { outline: 3px solid #111; outline-offset: 3px; }
+.checkout-form input:focus-visible, .checkout-form textarea:focus-visible,
+.filter-search input:focus-visible, .pickup-search:focus-visible,
+.delivery-option:focus-within, .pickup-list label:focus-within {
+  outline: 3px solid #111; outline-offset: 3px;
+}
+.filter-search:focus-within, .price-fields label:focus-within,
+.checkout-form input:focus, .checkout-form textarea:focus, .pickup-search:focus { border-color: #111; }
+.price-range input:focus-visible::-webkit-slider-thumb { outline: 3px solid #111; outline-offset: 2px; }
+.price-range input:focus-visible::-moz-range-thumb { outline: 3px solid #111; outline-offset: 2px; }
+.price-limits, .filter-group > summary small, .price-fields span,
+.product-article, .product-details > h2 span, .cart-head button,
+.order-card > div, .checkout-summary > div, .checkout-tabs button { color: var(--muted); }
+.price-fields input { font-family: var(--font-text); }
 h1, .section-title h2, .related > h2, .empty-card h1 {
   font-family: var(--font-display);
   font-weight: 700;
