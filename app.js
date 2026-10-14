@@ -94,6 +94,8 @@ products.forEach((product) => { if (product.brand === "ХАСЛ") product.brand 
 
 const emptyFilterState = () => ({ size: [], season: [], gender: [], brand: [], model: [], category: [], item: [], kind: [] });
 const state = { route: "home", section: "Кроссовки", filter: "Все", advancedFilters: { "Кроссовки": emptyFilterState(), "Одежда": emptyFilterState(), "Аксессуары": emptyFilterState() }, filterOpen: false, visibleCount: 18, selectedProduct: products.find((item) => item.article === "46419") || products[0], selectedSize: null, galleryIndex: 0, cart: [], checkoutStep: 1, checkout: { name: "", phone: "", city: "", comment: "", delivery: "pickup", pickup: "MSK2181" }, lastOrder: null };
+let galleryHoverTimer = null;
+let galleryScrollTimer = null;
 const meterMotion = { subtotal: null, discount: 0, progress: 0 };
 const app = document.querySelector("#app");
 const pageScrollTop = document.querySelector("#page-scroll-top");
@@ -224,9 +226,20 @@ function navigationButtons(items = navigationItems) {
   }).join("");
 }
 
+function desktopCartPreview() {
+  const subtotal = cartSubtotal();
+  const previewItems = state.cart.slice(-3).reverse();
+  const items = previewItems.length
+    ? previewItems.map((item) => `<article class="cart-popover-item"><img src="${item.product.image}" alt="" /><span><strong>${escapeHtml(shortProductName(item.product.name))}</strong><small>Размер ${escapeHtml(String(item.size))} · ${item.quantity} шт.</small></span><b>${money(item.product.price * item.quantity)}</b></article>`).join("")
+    : `<p class="cart-popover-empty">Корзина пока пуста</p>`;
+  return `<aside class="cart-popover" aria-label="Содержимое корзины"><header><strong>Корзина</strong><span>${cartCount()} шт.</span></header><div class="cart-popover-list">${items}</div>${previewItems.length ? `<footer><span>Сумма <b>${money(subtotal)}</b></span><button data-route="cart">Открыть корзину</button></footer>` : `<button class="cart-popover-catalog" data-section="Кроссовки">Перейти в каталог</button>`}</aside>`;
+}
+
 function header() {
   const discountHeader = ["home", "success"].includes(state.route) ? "" : `<div class="sticky-head"><div class="head-inner">${discountDashboard()}</div>${quickSectionsNav("head-inner")}</div>`;
-  return `${discountHeader}<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="ХАСЛ — на главную"><img src="${publicUrl("images/hasle_logo.svg")}" alt="ХАСЛ" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopNavigationItems)}</nav></header>`;
+  const desktopMenu = desktopNavigationItems.slice(0, -1);
+  const desktopCart = desktopNavigationItems.slice(-1);
+  return `${discountHeader}<header class="desktop-header head-inner"><button class="logo-button" data-route="home" aria-label="ХАСЛ — на главную"><img src="${publicUrl("images/hasle_logo.svg")}" alt="ХАСЛ" /></button><nav class="desktop-nav" aria-label="Основная навигация">${navigationButtons(desktopMenu)}<div class="desktop-cart-zone">${navigationButtons(desktopCart)}${desktopCartPreview()}</div></nav></header>`;
 }
 
 function bottomNav() {
@@ -305,7 +318,8 @@ function catalogView() {
 const productDescription = `Товары представленные на сайте являются качественной репликой (категория ААА+) Реплика категорий ААА+ это высокое качество, и долгий срок службы Высокие ботинки – это универсальный выбор для городских прогулок и активного отдыха. Они подойдут для холодной и дождливой погоды Характеристики Высоких ботинок:— Классическая шнуровка удобная фиксация стопы и индивидуальная посадка для любого типа ноги— Верх из текстиля и прессованной кожи легкие и прочные материалы для долгого срока службы— Защита в носке и пяточной зоне предотвращает повреждения и сохраняет форму ботинка— Высокая резиновая подошва амортизация и поддержка на любых поверхностях, комфорт при долгой носке— Глубокий протектор надёжное сцепление с мокрой и скользкой дорогой, уверенность в каждом шаге С чем носить Высокие ботинки:— Горпкор: карго-брюки, утеплённые куртки, флисовые свитшоты— Кэжуал: джинсы, базовые толстовки, джинсовые или кожаные куртки классическая шнуровка; верх из текстиля и прессованной кожи; защита в носке и пяточной зоне; высокая резиновая подошва; глубокий протектор.`;
 function productView() {
   const p = state.selectedProduct; const gallery = p.gallery || [p.image]; const related = products.filter((item) => item.section === p.section && item.id !== p.id).slice(0, 4);
-  return `<div class="product-view content-width"><button class="product-back" id="product-back" aria-label="Назад"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6" /></svg></button><div class="product-layout"><section class="gallery-panel"><div class="gallery-main"><img src="${gallery[state.galleryIndex] || gallery[0]}" alt="${escapeHtml(p.name)}" /></div>${gallery.length > 1 ? `<div class="thumbs">${gallery.map((src, index) => `<button data-gallery="${index}" class="${index === state.galleryIndex ? "active" : ""}"><img src="${src}" alt="Фото ${index + 1}" /></button>`).join("")}</div>` : ""}</section><section class="product-details"><p class="product-brand">${escapeHtml(p.brand)}</p><h1>${escapeHtml(p.name)}</h1><p class="product-article">Артикул ${p.article}</p><div class="product-price"><strong>${money(p.price)}</strong>${p.oldPrice > p.price ? `<del>${money(p.oldPrice)}</del>` : ""}</div><h2>Размер (EU) <span>— выберите</span></h2><div class="sizes">${p.sizes.map((size) => `<button data-size="${size}" class="${String(state.selectedSize) === String(size) ? "active" : ""}">${size}</button>`).join("")}</div><button class="red-button add-button" data-add="${p.id}">В корзину</button><dl class="specs"><div><dt>Цвет</dt><dd>Камуфляж</dd></div><div><dt>Сезон</dt><dd>Демисезон</dd></div><div><dt>Категория</dt><dd>${p.section === "Кроссовки" ? "Ботинки" : p.section}</dd></div><div><dt>Модель</dt><dd>${escapeHtml(p.name.split(" ")[0])}</dd></div><div><dt>Бренд</dt><dd>${escapeHtml(p.brand === "SNEAKERS" ? "ONE" : p.brand)}</dd></div></dl><p class="long-description">${productDescription}</p></section></div><section class="related"><h2>Смотрите также</h2><div>${related.map((item) => productCard(item, true)).join("")}</div></section></div>`;
+  const mobileSlides = gallery.length > 1 ? [...gallery, ...gallery, ...gallery].map((src, index) => `<figure class="gallery-slide" data-gallery-slide="${index % gallery.length}" ${index < gallery.length || index >= gallery.length * 2 ? 'aria-hidden="true"' : ""}><img src="${src}" alt="${index >= gallery.length && index < gallery.length * 2 ? `${escapeHtml(p.name)}, фото ${(index % gallery.length) + 1}` : ""}" /></figure>`).join("") : "";
+  return `<div class="product-view content-width"><button class="product-back" id="product-back" aria-label="Назад"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6" /></svg></button><div class="product-layout"><section class="gallery-panel" data-gallery-count="${gallery.length}"><div class="gallery-main"><img class="desktop-gallery-image" src="${gallery[state.galleryIndex] || gallery[0]}" alt="${escapeHtml(p.name)}" />${gallery.length > 1 ? `<div class="mobile-gallery-scroll" aria-label="Фотографии товара">${mobileSlides}</div><span class="gallery-swipe-hint">Листайте фото ↔</span>` : ""}</div>${gallery.length > 1 ? `<div class="thumbs">${gallery.map((src, index) => `<button data-gallery="${index}" class="${index === state.galleryIndex ? "active" : ""}" aria-label="Показать фото ${index + 1}"><img src="${src}" alt="" /></button>`).join("")}</div>` : ""}</section><section class="product-details"><p class="product-brand">${escapeHtml(p.brand)}</p><h1>${escapeHtml(p.name)}</h1><p class="product-article">Артикул ${p.article}</p><div class="product-price"><strong>${money(p.price)}</strong>${p.oldPrice > p.price ? `<del>${money(p.oldPrice)}</del>` : ""}</div><h2>Размер (EU) <span>— выберите</span></h2><div class="sizes">${p.sizes.map((size) => `<button data-size="${size}" class="${String(state.selectedSize) === String(size) ? "active" : ""}">${size}</button>`).join("")}</div><button class="red-button add-button" data-add="${p.id}">В корзину</button><dl class="specs"><div><dt>Цвет</dt><dd>Камуфляж</dd></div><div><dt>Сезон</dt><dd>Демисезон</dd></div><div><dt>Категория</dt><dd>${p.section === "Кроссовки" ? "Ботинки" : p.section}</dd></div><div><dt>Модель</dt><dd>${escapeHtml(p.name.split(" ")[0])}</dd></div><div><dt>Бренд</dt><dd>${escapeHtml(p.brand === "SNEAKERS" ? "ONE" : p.brand)}</dd></div></dl><p class="long-description">${productDescription}</p></section></div><section class="related"><h2>Смотрите также</h2><div>${related.map((item) => productCard(item, true)).join("")}</div></section></div>`;
 }
 
 function cartView() {
@@ -338,6 +352,10 @@ function restoreScrollPosition(scrollY, { immediate = false } = {}) {
 }
 
 function render({ keepScroll = false, restoreScroll = null, routeTransition = false } = {}) {
+  clearInterval(galleryHoverTimer);
+  clearTimeout(galleryScrollTimer);
+  galleryHoverTimer = null;
+  galleryScrollTimer = null;
   const scrollY = restoreScroll ?? (keepScroll ? window.scrollY : 0);
   const productOpening = state.route === "product" && restoreScroll === 0;
   if (productOpening) restoreScrollPosition(0, { immediate: true });
@@ -494,6 +512,72 @@ function addCardSize(button) {
   }, 1150);
 }
 
+function setupProductGallery() {
+  const panel = document.querySelector(".gallery-panel[data-gallery-count]");
+  if (!panel) return;
+  const count = Number(panel.dataset.galleryCount);
+  if (count < 2) return;
+  const image = panel.querySelector(".desktop-gallery-image");
+  const track = panel.querySelector(".mobile-gallery-scroll");
+  const thumbs = [...panel.querySelectorAll("[data-gallery]")];
+  const sources = thumbs.map((thumb) => thumb.querySelector("img")?.src).filter(Boolean);
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let imageAnimation = null;
+
+  const markActive = (index) => {
+    state.galleryIndex = index;
+    thumbs.forEach((thumb, thumbIndex) => thumb.classList.toggle("active", thumbIndex === index));
+  };
+  const showDesktopImage = (index, animate = true) => {
+    markActive(index);
+    if (!image || !sources[index] || image.src === sources[index]) return;
+    imageAnimation?.cancel();
+    image.src = sources[index];
+    if (animate && !reduced && image.animate) {
+      imageAnimation = image.animate([
+        { opacity: .28, transform: "scale(1.015)" },
+        { opacity: 1, transform: "scale(1)" },
+      ], { duration: 180, easing: "cubic-bezier(.23,1,.32,1)" });
+    }
+  };
+  const scrollToMiddle = (index, behavior = "auto") => {
+    if (!track || !track.clientWidth) return;
+    track.scrollTo({ left: (count + index) * track.clientWidth, behavior });
+  };
+
+  thumbs.forEach((thumb, index) => thumb.addEventListener("click", () => {
+    showDesktopImage(index);
+    scrollToMiddle(index, reduced ? "auto" : "smooth");
+  }));
+
+  if (track && window.matchMedia("(max-width: 767px)").matches) {
+    requestAnimationFrame(() => scrollToMiddle(state.galleryIndex));
+    const settleMobileGallery = () => {
+      if (!track.clientWidth) return;
+      const slideIndex = Math.round(track.scrollLeft / track.clientWidth);
+      const realIndex = ((slideIndex % count) + count) % count;
+      markActive(realIndex);
+      if (slideIndex < count || slideIndex >= count * 2) scrollToMiddle(realIndex);
+    };
+    track.addEventListener("scroll", () => {
+      clearTimeout(galleryScrollTimer);
+      galleryScrollTimer = setTimeout(settleMobileGallery, 90);
+    }, { passive: true });
+  }
+
+  if (!reduced && window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)").matches) {
+    const main = panel.querySelector(".gallery-main");
+    main?.addEventListener("mouseenter", () => {
+      clearInterval(galleryHoverTimer);
+      galleryHoverTimer = setInterval(() => showDesktopImage((state.galleryIndex + 1) % count), 1250);
+    });
+    main?.addEventListener("mouseleave", () => {
+      clearInterval(galleryHoverTimer);
+      galleryHoverTimer = null;
+    });
+  }
+}
+
 function bindEvents() {
   document.querySelectorAll("[data-route]").forEach((node) => node.addEventListener("click", () => navigate(node.dataset.route)));
   document.querySelectorAll("[data-section]").forEach((node) => node.addEventListener("click", () => navigate("catalog", { beforeEnter: () => { state.section = node.dataset.section; state.filter = "Все"; state.filterOpen = false; state.visibleCount = 18; } })));
@@ -535,7 +619,7 @@ function bindEvents() {
   document.querySelectorAll("[data-card-size]").forEach((node) => node.addEventListener("click", () => addCardSize(node)));
   document.querySelectorAll("[data-product]").forEach((node) => node.addEventListener("click", () => navigate("product", { beforeEnter: () => { state.selectedProduct = products.find((item) => item.id === node.dataset.product); state.selectedSize = null; state.galleryIndex = 0; } })));
   document.querySelector("#product-back")?.addEventListener("click", returnFromProduct);
-  document.querySelectorAll("[data-gallery]").forEach((node) => node.addEventListener("click", () => { state.galleryIndex = Number(node.dataset.gallery); render({ keepScroll: true }); }));
+  setupProductGallery();
   document.querySelectorAll("[data-size]").forEach((node) => node.addEventListener("click", () => { state.selectedSize = node.dataset.size; render({ keepScroll: true }); }));
   document.querySelectorAll("[data-add]").forEach((node) => node.addEventListener("click", () => addToCart(node.dataset.add)));
   document.querySelector("#load-more")?.addEventListener("click", () => { state.visibleCount += 18; render({ keepScroll: true }); });
