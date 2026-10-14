@@ -73,7 +73,6 @@ body.size-chart-open { overflow: hidden; }
 .cart-preview li span { color: #595959; }
 .cart-preview-total { display: flex; justify-content: space-between; gap: 12px; margin: 16px 0; font-size: 14px; }
 .desktop-nav .cart-preview .red-button { width: 100%; justify-content: center; background: var(--brand); color: white; }
-.cart-preview-anchor:focus-within .cart-preview { display: block; }
 @media (hover: hover) and (pointer: fine) {
   .cart-preview-anchor:hover .cart-preview { display: block; }
 }
