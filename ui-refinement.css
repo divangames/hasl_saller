@@ -134,7 +134,6 @@ button:disabled { cursor: not-allowed; }
 .card-size-button { height: 44px; font-size: 13px; border-radius: 6px; }
 .card-price { flex-wrap: wrap; }
 .card-price b, .product-price strong { color: var(--brand); }
-.card-price del { color: #666; }
 .load-more { min-height: 48px; font-size: 14px; padding-inline: 28px; }
 .product-back { display: inline-grid; place-items: center; width: 44px; height: 44px; margin-bottom: 16px; border-radius: 50%; background: white; }
 .product-back svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; }

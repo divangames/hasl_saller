@@ -98,6 +98,8 @@ const sectionCounts = { "Кроссовки": "1 457", "Одежда": "1 001", 
 
 const filterSchemas = {
   "Кроссовки": [
+    { key: "color", label: "Цвет", dynamic: true },
+    { key: "price", label: "Цена", range: true },
     { key: "size", label: "Размер", options: [25, 27, 28, 29, 30, 31, 32, 33, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49] },
     { key: "season", label: "Сезон", options: ["Демисезон", "Зима", "Лето"] },
     { key: "gender", label: "Пол", options: ["Детский", "Женский", "Мужской"] },
@@ -106,6 +108,8 @@ const filterSchemas = {
     { key: "category", label: "Категория", options: ["Баскетбол", "Бег", "Ботинки", "Ботинки высокие", "Ботинки низкие", "Кроссовки с мехом", "Спортивный стиль", "Футбол"] },
   ],
   "Одежда": [
+    { key: "color", label: "Цвет", dynamic: true },
+    { key: "price", label: "Цена", range: true },
     { key: "size", label: "Размер", options: [12, 15, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60] },
     { key: "season", label: "Сезон", options: ["Демисезон", "Зима", "Лето"] },
     { key: "gender", label: "Пол", options: ["Детский", "Женский", "Мужской"] },
@@ -114,6 +118,8 @@ const filterSchemas = {
     { key: "item", label: "Предмет одежды", options: ["Анораки", "Боксеры", "Бомберы", "Брюки спортивные", "Ветровки", "Джинсы", "Джоггеры", "Жилеты", "Куртки зимние", "Свитшоты", "Спортивные костюмы", "Толстовки", "Футболки", "Худи", "Шорты"] },
   ],
   "Аксессуары": [
+    { key: "color", label: "Цвет", dynamic: true },
+    { key: "price", label: "Цена", range: true },
     { key: "size", label: "Размер", options: [6, 7, 8, 9, 11, 12] },
     { key: "brand", label: "Бренд", searchable: true, options: ["Adidas", "AMIRI", "Arcteryx", "Balenciaga", "Burberry", "Calvin Klein", "Dior", "Dolce & Gabbana", "GOLOV.EJOY", "Gucci", "Hugo Boss", "Jordan", "Lacoste", "Louis Vuitton", "Nike", "ONE", "Prada", "Puma", "The North Face", "Warchief"] },
     { key: "model", label: "Модель", searchable: true, options: ["Балаклава", "Бафф", "Варежки", "Гетры", "Кепка", "Кошелёк", "Наушники", "Носки", "Очки", "Панама", "Перчатки", "Ремень", "Рюкзак", "Сумка", "Шапка"] },
@@ -124,7 +130,7 @@ const filterSchemas = {
 const knownBrands = ["The North Face", "Under Armour", "Stone Island", "New Balance", "GOLOV.EJOY", "PATAGONIA", "ESSENTIALS", "Timberland", "Salomon", "Warchief", "Adidas", "Gucci", "Hoka", "LOWA", "Nike", "Puma"];
 products.forEach((product) => { if (product.brand === "OUTMAX") product.brand = knownBrands.find((brand) => product.name.toLowerCase().includes(brand.toLowerCase())) || "ONE"; });
 
-const emptyFilterState = () => ({ size: [], season: [], gender: [], brand: [], model: [], category: [], item: [], kind: [] });
+const emptyFilterState = () => ({ color: [], price: { min: null, max: null }, size: [], season: [], gender: [], brand: [], model: [], category: [], item: [], kind: [] });
 const state = { route: "home", section: "Кроссовки", filter: "Все", advancedFilters: { "Кроссовки": emptyFilterState(), "Одежда": emptyFilterState(), "Аксессуары": emptyFilterState() }, filterOpen: false, visibleCount: 18, selectedProduct: products.find((item) => item.article === "46419") || products[0], selectedSize: null, galleryIndex: 0, cart: [], checkoutStep: 1, checkout: { name: "", phone: "", city: "", comment: "", delivery: "pickup", pickup: "", agreedToTerms: false }, lastOrder: null };
 const meterMotion = { subtotal: null, discount: 0, progress: 0 };
 const app = document.querySelector("#app");
@@ -295,9 +301,35 @@ function productType(product, key) {
   if (key === "kind") return /^варежк/i.test(product.name) ? "Варежки" : /^гетр/i.test(product.name) ? "Гетры" : /^балаклав|^бафф/i.test(product.name) ? "Балаклава" : product.name.split(" ")[0];
   return "";
 }
+function productColors(product) {
+  const value = product.specs?.["Цвет"];
+  if (!value) return [];
+  return String(value).split(/[,;/]+/).map((color) => color.trim()).filter(Boolean).map((color) => color.charAt(0).toLocaleUpperCase("ru-RU") + color.slice(1).toLocaleLowerCase("ru-RU"));
+}
+function sectionProducts(section = state.section) { return products.filter((product) => product.section === section); }
+function priceBounds(section = state.section) {
+  const prices = sectionProducts(section).map((product) => product.price);
+  const min = Math.floor(Math.min(...prices) / 100) * 100;
+  const max = Math.ceil(Math.max(...prices) / 100) * 100;
+  return { min, max: Math.max(min + 100, max) };
+}
+function normalizedPriceFilter(section = state.section) {
+  const bounds = priceBounds(section); const selected = state.advancedFilters[section].price;
+  return { min: selected.min ?? bounds.min, max: selected.max ?? bounds.max, bounds };
+}
+function filterOptions(group) {
+  if (!group.dynamic) return group.options || [];
+  if (group.key === "color") return [...new Set(sectionProducts().flatMap(productColors))].sort((a, b) => a.localeCompare(b, "ru"));
+  return [];
+}
 function matchesAdvancedFilters(product, filters = state.advancedFilters[state.section]) {
   return Object.entries(filters).every(([key, values]) => {
+    if (key === "price") {
+      const { min, max } = normalizedPriceFilter();
+      return product.price >= min && product.price <= max;
+    }
     if (!values.length) return true;
+    if (key === "color") return values.some((value) => productColors(product).includes(value));
     if (key === "size") return values.some((value) => product.sizes.map(String).includes(String(value)));
     if (key === "gender") return values.includes(normalizedGender(product.gender)) || product.gender === "Унисекс";
     if (key === "season") return values.includes(productSeason(product));
@@ -309,18 +341,31 @@ function matchesAdvancedFilters(product, filters = state.advancedFilters[state.s
 function filteredProducts() {
   return products.filter((product) => product.section === state.section && (state.filter === "Все" || product.gender === state.filter || product.gender === "Унисекс") && matchesAdvancedFilters(product));
 }
-function activeFilterCount(section = state.section) { return Object.values(state.advancedFilters[section]).reduce((sum, values) => sum + values.length, 0); }
+function priceFilterIsActive(section = state.section) {
+  const { min, max, bounds } = normalizedPriceFilter(section);
+  return min > bounds.min || max < bounds.max;
+}
+function activeFilterCount(section = state.section) {
+  return Object.entries(state.advancedFilters[section]).reduce((sum, [key, values]) => sum + (key === "price" ? Number(priceFilterIsActive(section)) : values.length), 0);
+}
 function filterOption(group, option) {
   const selected = state.advancedFilters[state.section][group.key].map(String).includes(String(option));
   return `<button type="button" class="filter-option ${selected ? "selected" : ""}" data-adv-group="${group.key}" data-adv-value="${escapeHtml(String(option))}" aria-pressed="${selected}">${escapeHtml(String(option))}</button>`;
 }
+function priceFilterMarkup() {
+  const { min, max, bounds } = normalizedPriceFilter();
+  const span = bounds.max - bounds.min;
+  const from = ((min - bounds.min) / span) * 100;
+  const to = ((max - bounds.min) / span) * 100;
+  return `<div class="price-filter" data-price-min="${bounds.min}" data-price-max="${bounds.max}" style="--price-from:${from}%;--price-to:${to}%"><div class="price-fields"><label><span>От</span><input type="number" id="price-min-input" min="${bounds.min}" max="${bounds.max}" step="100" value="${min}" inputmode="numeric" /></label><label><span>До</span><input type="number" id="price-max-input" min="${bounds.min}" max="${bounds.max}" step="100" value="${max}" inputmode="numeric" /></label></div><div class="price-range" aria-label="Диапазон цены"><span class="price-range-track"></span><input type="range" id="price-min-range" aria-label="Минимальная цена" min="${bounds.min}" max="${bounds.max}" step="100" value="${min}" /><input type="range" id="price-max-range" aria-label="Максимальная цена" min="${bounds.min}" max="${bounds.max}" step="100" value="${max}" /></div><div class="price-limits"><span>${money(bounds.min)}</span><span>${money(bounds.max)}</span></div></div>`;
+}
 function filterDrawer() {
   if (!state.filterOpen) return "";
   const groups = filterSchemas[state.section]; const count = filteredProducts().length;
-  return `<div class="filter-layer"><button class="filter-backdrop" id="filter-backdrop" aria-label="Закрыть фильтры"></button><aside class="filter-drawer" role="dialog" aria-modal="true" aria-labelledby="filter-title"><header><div><h2 id="filter-title">Фильтры</h2><p>${state.section}</p></div><button id="filter-close" aria-label="Закрыть">×</button></header><div class="filter-drawer-body">${groups.map((group, index) => { const selected = state.advancedFilters[state.section][group.key].length; const opened = index < 3 || selected; return `<details class="filter-group" data-filter-group="${group.key}" ${opened ? "open" : ""}><summary><span>${group.label}</span><small>${selected ? `Выбрано: ${selected}` : "Все"}</small></summary><div class="filter-group-content">${group.searchable ? `<label class="filter-search"><span aria-hidden="true">⌕</span><input type="search" data-filter-search="${group.key}" placeholder="Найти ${group.label.toLowerCase()}" autocomplete="off" /></label>` : ""}<div class="filter-options">${group.options.map((option) => filterOption(group, option)).join("")}</div><p class="filter-no-results" hidden>Ничего не найдено</p></div></details>`; }).join("")}</div><footer><button class="filter-reset" id="filter-reset" ${activeFilterCount() ? "" : "disabled"}>Сбросить</button><button class="filter-apply" id="filter-apply">Показать <span>${count}</span></button></footer></aside></div>`;
+  return `<div class="filter-layer"><button class="filter-backdrop" id="filter-backdrop" aria-label="Закрыть фильтры"></button><aside class="filter-drawer" role="dialog" aria-modal="true" aria-labelledby="filter-title"><header><div><h2 id="filter-title">Фильтры</h2><p>${state.section}</p></div><button id="filter-close" aria-label="Закрыть">×</button></header><div class="filter-drawer-body">${groups.map((group, index) => { const selected = group.range ? Number(priceFilterIsActive()) : state.advancedFilters[state.section][group.key].length; const opened = index < 4 || selected; const range = normalizedPriceFilter(); const summary = group.range && selected ? `${money(range.min)} — ${money(range.max)}` : selected ? `Выбрано: ${selected}` : "Все"; return `<details class="filter-group" data-filter-group="${group.key}" ${opened ? "open" : ""}><summary><span>${group.label}</span><small>${summary}</small></summary><div class="filter-group-content">${group.range ? priceFilterMarkup() : `${group.searchable ? `<label class="filter-search"><span aria-hidden="true">⌕</span><input type="search" data-filter-search="${group.key}" placeholder="Найти ${group.label.toLowerCase()}" autocomplete="off" /></label>` : ""}<div class="filter-options">${filterOptions(group).map((option) => filterOption(group, option)).join("")}</div><p class="filter-no-results" hidden>Ничего не найдено</p>`}</div></details>`; }).join("")}</div><footer><button class="filter-reset" id="filter-reset" ${activeFilterCount() ? "" : "disabled"}>Сбросить</button><button class="filter-apply" id="filter-apply">Показать <span>${count}</span></button></footer></aside></div>`;
 }
 function activeFilterBar() {
-  const entries = Object.entries(state.advancedFilters[state.section]).flatMap(([group, values]) => values.map((value) => ({ group, value })));
+  const entries = Object.entries(state.advancedFilters[state.section]).flatMap(([group, values]) => group === "price" ? (priceFilterIsActive() ? [{ group, value: `Цена: ${money(normalizedPriceFilter().min)} — ${money(normalizedPriceFilter().max)}` }] : []) : values.map((value) => ({ group, value })));
   if (!entries.length) return "";
   return `<div class="active-filter-bar" aria-label="Выбранные фильтры"><div>${entries.map(({ group, value }) => `<button data-remove-filter="${group}" data-remove-value="${escapeHtml(String(value))}">${escapeHtml(String(value))}<span>×</span></button>`).join("")}</div><button id="clear-active-filters">Очистить</button></div>`;
 }
@@ -359,9 +404,8 @@ function sizeLabel(product, size) {
 }
 const addedCheck = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8" /></svg>';
 function productCard(product, compact = false) {
-  const discount = product.oldPrice > product.price ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
   const sizes = product.sizes.map((size) => { const key = `${product.id}:${size}`; const added = recentCardAdds.has(key); return `<button type="button" class="card-size-button ${added ? "is-added" : ""}" data-card-product="${product.id}" data-card-size="${escapeHtml(String(size))}" aria-label="${added ? "Добавлено в корзину" : `Добавить размер ${escapeHtml(String(size))}${sizeCentimeters(product, size) ? `, ${sizeCentimeters(product, size)} см` : ""} в корзину`}" ${added ? "disabled" : ""}>${added ? addedCheck : sizeLabel(product, size)}</button>`; }).join("");
-  return `<article class="product-card ${compact ? "compact" : ""}"><button class="product-open" data-product="${product.id}" aria-label="Открыть ${escapeHtml(product.name)}"><span class="card-image"><img src="${product.image}" alt="${escapeHtml(product.name)}" loading="lazy" />${discount >= 45 ? `<i>−${discount}%</i>` : ""}</span><span class="card-info"><strong title="${escapeHtml(product.name)}">${escapeHtml(product.name)}</strong><small>Арт. ${product.article}</small></span></button><div class="card-buy"><span class="card-sizes"><em>Размеры</em><span class="card-size-list">${sizes}</span></span><span class="card-price"><b>${currentProductPrice(product)}</b>${product.oldPrice > product.price ? `<del>${money(product.oldPrice)}</del>` : ""}</span>${priceDiscountNote()}${sizeStockNote(product, selectedCardSizes.get(product.id))}</div></article>`;
+  return `<article class="product-card ${compact ? "compact" : ""}"><button class="product-open" data-product="${product.id}" aria-label="Открыть ${escapeHtml(product.name)}"><span class="card-image"><img src="${product.image}" alt="${escapeHtml(product.name)}" loading="lazy" /></span><span class="card-info"><strong title="${escapeHtml(product.name)}">${escapeHtml(product.name)}</strong><small>Арт. ${product.article}</small></span></button><div class="card-buy"><span class="card-sizes"><em>Размеры</em><span class="card-size-list">${sizes}</span></span><span class="card-price"><b>${currentProductPrice(product)}</b></span>${priceDiscountNote()}${sizeStockNote(product, selectedCardSizes.get(product.id))}</div></article>`;
 }
 
 function catalogView() {
@@ -373,7 +417,7 @@ function catalogView() {
 
 function productView() {
   const p = state.selectedProduct; const gallery = p.gallery || [p.image]; const related = products.filter((item) => item.section === p.section && item.id !== p.id).slice(0, 4);
-  return `<div class="product-view content-width"><button class="product-back" id="product-back" aria-label="Назад"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6" /></svg></button><div class="product-layout"><section class="gallery-panel"><div class="gallery-main"><img src="${gallery[state.galleryIndex] || gallery[0]}" alt="${escapeHtml(p.name)}" /></div>${gallery.length > 1 ? `<div class="thumbs">${gallery.map((src, index) => `<button data-gallery="${index}" class="${index === state.galleryIndex ? "active" : ""}"><img src="${src}" alt="Фото ${index + 1}" /></button>`).join("")}</div>` : ""}</section><section class="product-details"><p class="product-brand">${escapeHtml(p.brand)}</p><h1>${escapeHtml(p.name)}</h1><p class="product-article">Артикул ${p.article}</p><div class="product-price"><strong>${currentProductPrice(p)}</strong>${p.oldPrice > p.price ? `<del>${money(p.oldPrice)}</del>` : ""}</div>${priceDiscountNote()}<h2 class="size-heading">${p.section === "Кроссовки" ? `Размер (европейский) <span class="size-help"><button type="button" class="size-help-trigger" aria-label="Подсказка по размерам" aria-expanded="false" aria-controls="size-help-text">i</button><span class="size-help-text" id="size-help-text" role="tooltip">Европейские размеры маломерят относительно российских. Для точного выбора ориентируйтесь на замеры в см.</span></span>` : "Размер"} <span>— выберите</span></h2>${sizeChartDialog(p)}<div class="sizes">${p.sizes.map((size) => `<button data-size="${size}" aria-pressed="${String(state.selectedSize) === String(size)}" class="${String(state.selectedSize) === String(size) ? "active" : ""}">${sizeLabel(p, size)}</button>`).join("")}</div>${sizeStockNote(p, state.selectedSize)}<button class="red-button add-button" data-add="${p.id}">В корзину</button>${productSpecsMarkup(p)}${productDescriptionMarkup(p)}</section></div><section class="related"><h2>Смотрите также</h2><div>${related.map((item) => productCard(item, true)).join("")}</div></section></div>`;
+  return `<div class="product-view content-width"><button class="product-back" id="product-back" aria-label="Назад"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6" /></svg></button><div class="product-layout"><section class="gallery-panel"><div class="gallery-main"><img src="${gallery[state.galleryIndex] || gallery[0]}" alt="${escapeHtml(p.name)}" /></div>${gallery.length > 1 ? `<div class="thumbs">${gallery.map((src, index) => `<button data-gallery="${index}" class="${index === state.galleryIndex ? "active" : ""}"><img src="${src}" alt="Фото ${index + 1}" /></button>`).join("")}</div>` : ""}</section><section class="product-details"><p class="product-brand">${escapeHtml(p.brand)}</p><h1>${escapeHtml(p.name)}</h1><p class="product-article">Артикул ${p.article}</p><div class="product-price"><strong>${currentProductPrice(p)}</strong></div>${priceDiscountNote()}<h2 class="size-heading">${p.section === "Кроссовки" ? `Размер (европейский) <span class="size-help"><button type="button" class="size-help-trigger" aria-label="Подсказка по размерам" aria-expanded="false" aria-controls="size-help-text">i</button><span class="size-help-text" id="size-help-text" role="tooltip">Европейские размеры маломерят относительно российских. Для точного выбора ориентируйтесь на замеры в см.</span></span>` : "Размер"} <span>— выберите</span></h2>${sizeChartDialog(p)}<div class="sizes">${p.sizes.map((size) => `<button data-size="${size}" aria-pressed="${String(state.selectedSize) === String(size)}" class="${String(state.selectedSize) === String(size) ? "active" : ""}">${sizeLabel(p, size)}</button>`).join("")}</div>${sizeStockNote(p, state.selectedSize)}<button class="red-button add-button" data-add="${p.id}">В корзину</button>${productSpecsMarkup(p)}${productDescriptionMarkup(p)}</section></div><section class="related"><h2>Смотрите также</h2><div>${related.map((item) => productCard(item, true)).join("")}</div></section></div>`;
 }
 
 function cartView() {
@@ -386,7 +430,7 @@ function cartView() {
 const deliveryOptions = [{ id: "pickup", title: "СДЭК - до ПВЗ, 500 руб.", price: 500 }, { id: "courier", title: "СДЭК - курьером, 920 руб.", price: 920 }, { id: "post", title: "Почта России, 610 руб.", price: 610 }, { id: "postamat", title: "Почта России (постамат), 640 руб.", price: 640 }];
 function orderAmounts(deliveryId = state.checkout.delivery) { const subtotal = cartSubtotal(); const info = discountInfo(subtotal); const discountValue = Math.round(subtotal * info.discount / 100); const delivery = state.checkoutStep === 2 ? deliveryOptions.find((item) => item.id === deliveryId)?.price || 0 : 0; return { subtotal, discount: info.discount, discountValue, delivery, total: subtotal - discountValue + delivery }; }
 function checkoutSummary() { const amount = orderAmounts(); return `<aside class="checkout-summary"><div><span>Товаров</span><b>${cartCount()}</b></div><div><span>Сумма</span><b>${money(amount.subtotal)}</b></div><div class="green"><span>Скидка ${amount.discount}%</span><b>−${money(amount.discountValue)}</b></div>${state.checkoutStep === 2 ? `<div><span>Доставка</span><b>${money(amount.delivery)}</b></div>` : ""}<hr /><div class="summary-total"><span>Итого</span><strong>${money(amount.total)}</strong></div></aside>`; }
-function checkoutDataStep() { const c = state.checkout; return `<form id="checkout-data-form" class="checkout-form" novalidate><label>ФИО *<input name="name" autocomplete="name" required value="${escapeHtml(c.name)}" placeholder="Иванов Иван Иванович" /></label><label>Телефон *<input name="phone" type="tel" autocomplete="tel" required value="${escapeHtml(c.phone)}" placeholder="+7 (999) 999-99-99" inputmode="tel" /></label><div class="city-field"><label for="checkout-city">Город *</label><input id="checkout-city" name="city" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="city-options" aria-describedby="city-status" required value="${escapeHtml(c.city)}" placeholder="Начните вводить город" /><ul id="city-options" class="city-options" role="listbox" aria-label="Города России" hidden></ul><small id="city-status" role="status">Введите минимум 2 буквы. Если города нет в списке, укажите его вручную.</small></div><label>Комментарий<textarea name="comment" rows="4" placeholder="Пожелания к заказу">${escapeHtml(c.comment)}</textarea></label><label class="terms-consent"><input type="checkbox" name="agreedToTerms" required ${c.agreedToTerms ? "checked" : ""} /><span>Я ознакомился с <a href="https://outmaxshop.ru/privacy" target="_blank" rel="noopener noreferrer">условиями акции</a></span></label><p id="form-error" class="form-error" role="alert"></p><button class="red-button" type="submit">Далее — доставка</button></form>`; }
+function checkoutDataStep() { const c = state.checkout; return `<form id="checkout-data-form" class="checkout-form" novalidate><label>ФИО *<input name="name" autocomplete="name" required value="${escapeHtml(c.name)}" placeholder="Иванов Иван Иванович" /></label><label>Телефон *<input name="phone" type="tel" autocomplete="tel" required value="${escapeHtml(c.phone)}" placeholder="+7 (999) 999-99-99" inputmode="tel" /></label><div class="city-field"><label for="checkout-city">Город *</label><input id="checkout-city" name="city" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="city-options" aria-describedby="city-status" required value="${escapeHtml(c.city)}" placeholder="Начните вводить город" /><ul id="city-options" class="city-options" role="listbox" aria-label="Города России" hidden></ul><small id="city-status" role="status">Введите минимум 2 буквы. Если города нет в списке, укажите его вручную.</small></div><label>Комментарий<textarea name="comment" rows="4" placeholder="Пожелания к заказу">${escapeHtml(c.comment)}</textarea></label><label class="terms-consent"><input type="checkbox" name="agreedToTerms" required ${c.agreedToTerms ? "checked" : ""} /><span>Я ознакомился с <a href="https://sale.outmaxshop.ru/terms" target="_blank" rel="noopener noreferrer">условиями акции</a></span></label><p id="form-error" class="form-error" role="alert"></p><button class="red-button" type="submit">Далее — доставка</button></form>`; }
 function checkoutDeliveryStep() {
   const c = state.checkout; const points = [["MSK2181", "1-й Ботанический пр-д, 5", "Пн–Пт 10:00–21:00, Сб–Вс 10:00–20:00"], ["MSK2501", "1-й Грайвороновский пр-д, 7А к.3", "Пн–Вс 10:00–22:00 · постамат"], ["MSK2264", "1-й Котляковский пер., 2Ак3В", "Пн–Пт 10:00–21:00, Сб–Вс 10:00–20:00"]];
   return `<div class="delivery-step"><div class="customer-card"><p>${escapeHtml(c.name)}, ${escapeHtml(c.phone)}</p><p>${escapeHtml(c.city)}, индекс 101000</p></div><h2>Способ доставки</h2><div class="delivery-list">${deliveryOptions.map((item) => `<label class="delivery-option ${c.delivery === item.id ? "selected" : ""}"><input type="radio" name="delivery" value="${item.id}" ${c.delivery === item.id ? "checked" : ""} /><i></i><span>${item.title}</span></label>`).join("")}</div>${c.delivery === "pickup" ? `<div class="pickup-list"><h2>Пункт выдачи СДЭК</h2><p class="pickup-hint" id="pickup-hint">${c.pickup ? "Пункт выдачи выбран. При необходимости выберите другой." : "Выберите пункт выдачи СДЭК из списка, чтобы отправить заявку."}</p><input class="pickup-search" placeholder="Поиск по адресу" />${points.map(([id, title, note]) => `<label><input type="radio" name="pickup" value="${id}" ${c.pickup === id ? "checked" : ""} /><span><b>${title}</b><small>${note} · ${id}</small></span></label>`).join("")}</div>` : ""}<p id="delivery-error" class="form-error" role="alert" tabindex="-1"></p><div class="checkout-actions"><button class="outline-button" id="checkout-back">Назад</button><button class="red-button" id="checkout-submit">Отправить заявку</button></div></div>`;
@@ -609,6 +653,31 @@ function bindEvents() {
     const applyCount = document.querySelector("#filter-apply span"); if (applyCount) applyCount.textContent = String(filteredProducts().length);
     const reset = document.querySelector("#filter-reset"); if (reset) reset.disabled = activeFilterCount() === 0;
   }));
+  const priceFilter = document.querySelector(".price-filter");
+  if (priceFilter) {
+    const bounds = { min: Number(priceFilter.dataset.priceMin), max: Number(priceFilter.dataset.priceMax) };
+    const minInput = document.querySelector("#price-min-input"); const maxInput = document.querySelector("#price-max-input");
+    const minRange = document.querySelector("#price-min-range"); const maxRange = document.querySelector("#price-max-range");
+    const updatePrice = (edge, rawValue) => {
+      const value = Number(rawValue); if (!Number.isFinite(value)) return;
+      const current = normalizedPriceFilter();
+      const min = edge === "min" ? Math.max(bounds.min, Math.min(value, current.max)) : current.min;
+      const max = edge === "max" ? Math.min(bounds.max, Math.max(value, current.min)) : current.max;
+      state.advancedFilters[state.section].price = { min: min === bounds.min ? null : min, max: max === bounds.max ? null : max };
+      minInput.value = minRange.value = String(min); maxInput.value = maxRange.value = String(max);
+      const span = bounds.max - bounds.min;
+      priceFilter.style.setProperty("--price-from", `${((min - bounds.min) / span) * 100}%`);
+      priceFilter.style.setProperty("--price-to", `${((max - bounds.min) / span) * 100}%`);
+      const summary = priceFilter.closest(".filter-group")?.querySelector("summary small");
+      if (summary) summary.textContent = priceFilterIsActive() ? `${money(min)} — ${money(max)}` : "Все";
+      const applyCount = document.querySelector("#filter-apply span"); if (applyCount) applyCount.textContent = String(filteredProducts().length);
+      const reset = document.querySelector("#filter-reset"); if (reset) reset.disabled = activeFilterCount() === 0;
+    };
+    minRange.addEventListener("input", () => updatePrice("min", minRange.value));
+    maxRange.addEventListener("input", () => updatePrice("max", maxRange.value));
+    minInput.addEventListener("change", () => updatePrice("min", minInput.value));
+    maxInput.addEventListener("change", () => updatePrice("max", maxInput.value));
+  }
   document.querySelectorAll("[data-filter-search]").forEach((input) => input.addEventListener("input", () => {
     const query = input.value.trim().toLowerCase(); const group = input.closest(".filter-group"); let visible = 0;
     group.querySelectorAll(".filter-option").forEach((option) => { const match = option.textContent.toLowerCase().includes(query); option.hidden = !match; if (match) visible += 1; });
@@ -618,7 +687,7 @@ function bindEvents() {
   document.querySelector("#filter-reset")?.addEventListener("click", () => resetFilters(true));
   document.querySelector("#clear-active-filters")?.addEventListener("click", () => resetFilters(false));
   document.querySelector("#empty-reset")?.addEventListener("click", () => resetFilters(false));
-  document.querySelectorAll("[data-remove-filter]").forEach((node) => node.addEventListener("click", () => { const values = state.advancedFilters[state.section][node.dataset.removeFilter]; state.advancedFilters[state.section][node.dataset.removeFilter] = values.filter((value) => String(value) !== node.dataset.removeValue); state.visibleCount = 18; render({ keepScroll: true }); }));
+  document.querySelectorAll("[data-remove-filter]").forEach((node) => node.addEventListener("click", () => { const group = node.dataset.removeFilter; const values = state.advancedFilters[state.section][group]; state.advancedFilters[state.section][group] = group === "price" ? { min: null, max: null } : values.filter((value) => String(value) !== node.dataset.removeValue); state.visibleCount = 18; render({ keepScroll: true }); }));
   document.querySelectorAll("[data-card-size]").forEach((node) => node.addEventListener("click", () => addCardSize(node)));
   document.querySelectorAll("[data-product]").forEach((node) => node.addEventListener("click", () => navigate("product", { beforeEnter: () => { state.selectedProduct = products.find((item) => item.id === node.dataset.product); state.selectedSize = null; state.galleryIndex = 0; } })));
   document.querySelector("#product-back")?.addEventListener("click", returnFromProduct);
