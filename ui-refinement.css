@@ -85,11 +85,11 @@ button:disabled { cursor: not-allowed; }
 .desktop-header { border: 0; border-radius: 0; box-shadow: none; background: var(--background); backdrop-filter: none; }
 .desktop-nav small { font-size: 14px; }
 .desktop-nav button[data-route="cart"] { box-shadow: none; border: 0; }
-.desktop-nav button[data-route="terms"] .nav-icon::before,
-.bottom-nav button[data-route="terms"] .nav-icon::before { display: block; pointer-events: none; border-color: var(--brand); }
+.desktop-nav [data-terms-link] .nav-icon::before,
+.bottom-nav [data-terms-link] .nav-icon::before { display: block; pointer-events: none; border-color: var(--brand); }
 @media (prefers-reduced-motion: reduce) {
-  .desktop-nav button[data-route="terms"] .nav-icon::before,
-  .bottom-nav button[data-route="terms"] .nav-icon::before { display: none; animation: none; }
+  .desktop-nav [data-terms-link] .nav-icon::before,
+  .bottom-nav [data-terms-link] .nav-icon::before { display: none; animation: none; }
 }
 .sticky-head { top: 0; margin: 0; border: 0; border-radius: 24px; background: var(--background); backdrop-filter: none; box-shadow: 0 6px 16px #00000008; }
 .quick-sections button { border: 0; box-shadow: none; background: #e9e9e9; }
@@ -112,17 +112,17 @@ button:disabled { cursor: not-allowed; }
 .route-home .hero { box-shadow: none; border-radius: 16px; }
 .hero-copy h1 { margin: 0; font-size: clamp(32px, 4vw, 54px); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; }
 .hero-copy > small { color: white; }
-.hero-cta { display: inline-flex; align-items: center; min-height: 44px; margin-top: 16px; padding: 8px 16px; border-radius: 8px; background: white; color: #111; font-size: 14px; font-weight: 700; }
+.hero-cta { display: inline-flex; align-items: center; min-height: 44px; margin-top: 16px; padding: 8px 16px; border-radius: 8px; background: white; color: #111; font-size: 14px; font-weight: 700; text-decoration: none; }
 .home-filter-stack { position: relative; top: auto; }
 .route-home .home-filter-stack .discount-dashboard { border: 0; border-radius: 12px; box-shadow: none; }
 .section-title h2, .route-home .section-title h2 { font-size: 26px; text-transform: none; }
 .route-home .category-grid > button { border-radius: 12px; box-shadow: none; }
 .route-home .category-grid strong { text-transform: none; }
 .sale-note, .route-home .sale-note { background: #fff; border: 0; box-shadow: none; padding: 24px; gap: 16px; }
-.sale-note-icon, .sale-note button { box-shadow: none; border: 0; }
+.sale-note-icon, .sale-note a { box-shadow: none; border: 0; }
 .sale-note strong { font-size: 18px; }
 .sale-note p { max-width: 72ch; font-size: 16px; line-height: 1.65; color: #4b4b4b; }
-.sale-note button { min-height: 44px; font-size: 14px; background: #fbe8eb; color: #a71928; }
+.sale-note a { min-height: 44px; font-size: 14px; background: #fbe8eb; color: #a71928; }
 .desktop-nav button.active { box-shadow: none; }
 .catalog-title { border: 0; padding-bottom: 12px; }
 .catalog-title h1, .cart-head h1, .checkout-view > h1 { text-transform: none; }
@@ -202,10 +202,10 @@ button:disabled { cursor: not-allowed; }
   .route-home .sale-note { padding: 18px 16px; margin: 28px 0 0; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; }
   .route-home .sale-note strong { font-size: 16px; }
   .route-home .sale-note p { font-size: 16px; line-height: 1.6; }
-  .route-home .sale-note button { min-height: 44px; font-size: 14px; }
+  .route-home .sale-note a { min-height: 44px; font-size: 14px; }
   .bottom-nav { height: calc(64px + env(safe-area-inset-bottom)); border: 0; background: white; backdrop-filter: none; }
-  .bottom-nav button { color: #595959; }
-  .bottom-nav button.active { color: var(--brand); }
+  .bottom-nav :is(button, a) { color: #595959; }
+  .bottom-nav :is(button, a).active { color: var(--brand); }
   .bottom-nav small { font-size: 11px; }
   .quick-sections button { font-size: 11px; }
   .quick-tab-image { width: 32px; height: 32px; flex-basis: 32px; }
