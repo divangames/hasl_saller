@@ -77,7 +77,7 @@ for (const [article, details] of Object.entries(suppliedDetails)) {
 }
 for (const product of [...sneakerSeeds, ...clothingSeeds, ...accessorySeeds, ...extraProducts]) {
   const details = suppliedDetails[product.article];
-  product.gender = ({ "Мужской": "Мужские", "Женский": "Женские", "Детский": "Детские" })[details?.gender] || details?.gender || "Не указан";
+  product.gender = ({ "Мужской": "Мужские", "Женский": "Женские", "Детский": "Детские" })[details?.gender] || details?.gender || product.gender || "Не указан";
   if (!details) continue;
   product.description = details.description;
   product.specs = details.specs;
@@ -252,7 +252,7 @@ function quickSectionsNav(extraClass = "") {
 }
 
 const navigationItems = [["home", "Главная", "6d1ae.svg", "91142.svg"], ["sneakers", "Кроссовки", "0f792.svg", "f2bb2.svg"], ["cart", "Корзина", "8b8e1.svg", "c6294.svg"], ["clothes", "Одежда", "14327.svg", "14327.svg"], ["terms", "Условия", "e5bc1.svg", "ab7d3.svg"]];
-const desktopNavigationItems = [navigationItems[0], navigationItems[1], navigationItems[3], navigationItems[4], navigationItems[2]];
+const desktopNavigationItems = [navigationItems[0], navigationItems[1], navigationItems[3], ["accessories", "Аксессуары", "14327.svg", "14327.svg"], navigationItems[4], navigationItems[2]];
 function cartPreview() {
   const discount = discountInfo().discount;
   return `<section class="cart-preview" aria-label="Содержимое корзины"><h2>Корзина · ${cartCount()}</h2>${state.cart.length ? `<ul>${state.cart.map(item => `<li><img src="${escapeHtml(item.product.image)}" alt="" /><div><strong>${escapeHtml(item.product.name)}</strong><span>Размер ${escapeHtml(item.size)} · ${item.quantity} шт.</span><b>${money(item.product.price * item.quantity * (1 - discount / 100))}</b></div></li>`).join("")}</ul><div class="cart-preview-total"><span>Итого · скидка ${discount}%</span><strong>${money(cartSubtotal() * (1 - discount / 100))}</strong></div><button class="red-button" data-route="cart">Перейти в корзину</button>` : '<p>В корзине пока нет товаров</p>'}</section>`;
@@ -268,8 +268,8 @@ function sizeStockNote(product, size) {
 const selectedCardSizes = new Map();
 function navigationButtons(items = navigationItems) {
   return items.map(([key, label, activeIcon, icon]) => {
-    const active = key === state.route || (key === "sneakers" && state.route === "catalog" && state.section === "Кроссовки") || (key === "clothes" && state.route === "catalog" && state.section === "Одежда");
-    const action = key === "sneakers" ? 'data-section="Кроссовки"' : key === "clothes" ? 'data-section="Одежда"' : key === "terms" ? "" : `data-route="${key}"`;
+    const active = key === state.route || (key === "sneakers" && state.route === "catalog" && state.section === "Кроссовки") || (key === "clothes" && state.route === "catalog" && state.section === "Одежда") || (key === "accessories" && state.route === "catalog" && state.section === "Аксессуары");
+    const action = key === "sneakers" ? 'data-section="Кроссовки"' : key === "clothes" ? 'data-section="Одежда"' : key === "accessories" ? 'data-section="Аксессуары"' : key === "terms" ? "" : `data-route="${key}"`;
     const glyph = key === "home" ? '<span class="home-menu-glyph" aria-hidden="true"></span>' : key === "sneakers" ? '<span class="sneaker-menu-glyph" aria-hidden="true"></span>' : key === "terms" ? '<span class="terms-menu-glyph" aria-hidden="true"></span>' : `<img src="${A}/${active ? activeIcon : icon}" alt="" />`;
     const accessibleLabel = key === "cart" ? `aria-label="Корзина, товаров: ${cartCount()}"` : "";
     const content = `<span class="nav-icon">${glyph}${key === "cart" && cartCount() ? `<i>${cartCount()}</i>` : ""}</span><small>${label}</small>`;
@@ -287,8 +287,10 @@ function bottomNav() {
   return `<nav class="bottom-nav" aria-label="Навигация">${navigationButtons()}</nav>`;
 }
 
+const editorialArrow = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg>';
 function homeView() {
-  return `<div class="home-view"><section class="hero"><img src="${publicUrl("images/banners/main_02.png")}" alt="Скидка до 50%" /><span class="hero-overlay"></span><div class="hero-copy"><h1>Скидка до 50%</h1><small>Чем выше сумма корзины — тем больше скидка.<br />Подробные условия внутри.</small><a class="hero-cta" href="${TERMS_URL}" target="_blank" rel="noopener noreferrer">Условия акции</a></div></section><div class="home-filter-stack"><div class="home-filter-inner">${discountDashboard()}</div></div><section class="categories-section"><div class="section-title"><h2>Категории</h2></div><div class="category-grid"><button data-section="Кроссовки"><img src="${publicUrl("images/banners/sneakers_02.png?v=f3f9c50b")}" alt="Кроссовки" /><span><strong>Кроссовки</strong><small>Более 1400 моделей</small></span></button><button data-section="Одежда"><img src="${publicUrl("images/banners/clothes_02.png?v=20261013c")}" alt="Одежда" /><span><strong>Одежда</strong><small>Более 900 наименований</small></span></button><button data-section="Аксессуары"><img src="${publicUrl("images/banners/other_02.png?v=20261013c")}" alt="Аксессуары" /><span><strong>Аксессуары</strong><small>Более 500 товаров</small></span></button></div>${saleTermsNote()}</section></div>`;
+  const categories = [["Кроссовки", "sneakers", "Более 1400 моделей"], ["Одежда", "clothes", "Более 900 наименований"], ["Аксессуары", "other", "Более 500 товаров"]];
+  return `<div class="home-view"><section class="campaign-banner" aria-labelledby="home-title"><div class="campaign-copy"><h1 id="home-title">Больше вещей.<br />Больше выгоды.</h1><p>Собирайте свой заказ — скидка растёт вместе с суммой корзины и применяется автоматически.</p><div class="campaign-actions"><button class="hero-cta" data-section="Кроссовки">Перейти в каталог ${editorialArrow}</button><a href="${TERMS_URL}">Как работает акция</a></div></div><div class="campaign-offer"><span>Скидка до</span><strong>50%</strong><p>На весь заказ<br /><small>при сумме от 47 000 ₽ до скидки</small></p></div></section><div class="home-filter-stack"><div class="home-filter-inner">${discountDashboard()}</div></div><section class="categories-section"><div class="section-title"><h2>Собери свой стиль</h2><p>Обувь, одежда и детали.</p></div><div class="category-grid">${categories.map(([name, file, count])=>`<button data-section="${name}"><img src="${publicUrl('images/banners/'+file+'_02.png')}" alt="" loading="lazy" /><span><strong>${name}</strong><small>${count}</small></span>${editorialArrow}</button>`).join('')}</div>${saleTermsNote()}<footer class="brand-close"><img src="${publicUrl('images/hasle_logo.svg')}" alt="ХАСЛ" /><p>Твой стиль. Твоя выгода.</p><button data-section="Кроссовки">Вернуться к вещам ${editorialArrow}</button></footer></section></div>`;
 }
 
 function normalizedGender(gender) { return ({ "Детские": "Детский", "Женские": "Женский", "Мужские": "Мужской" })[gender] || gender; }
@@ -373,7 +375,7 @@ function activeFilterBar() {
 }
 
 function saleTermsNote() {
-  return `<aside class="sale-note" aria-label="Краткие условия акции"><span class="sale-note-icon" aria-hidden="true">%</span><div><strong>Условия акции</strong><p>Добавляйте товары в корзину — чем выше сумма заказа, тем больше скидка. Сумма рассчитывается по ценам до скидки, а скидка применяется автоматически. Доставка платная и оплачивается на сайте, товары — при получении. Заказ выкупается только целиком. Возврат — по согласованию с интернет-магазином.</p></div><a href="${TERMS_URL}" target="_blank" rel="noopener noreferrer">Подробнее<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></a></aside>`;
+  return `<aside class="sale-note" aria-label="Краткие условия акции"><span class="sale-note-icon" aria-hidden="true">%</span><div><strong>Условия акции</strong><ol class="sale-note-steps"><li><strong>Добавляйте товары</strong><p>Сумма считается по ценам до скидки.</p></li><li><strong>Достигайте порога</strong><p>Чем выше сумма — тем выше процент.</p></li><li><strong>Получайте выгоду</strong><p>Скидка применяется автоматически в заказе.</p></li><li><strong>Доставка</strong><p>В рамках акции доставка платная.</p></li><li><strong>Оплата</strong><p>Доставка оплачивается на сайте.<br />Товар — при получении.</p></li><li><strong>Выкуп</strong><p>Заказ можно выкупить только целиком.</p></li><li><strong>Возврат</strong><p>Осуществляется по согласованию с интернет-магазином.</p></li></ol></div><a href="${TERMS_URL}" target="_blank" rel="noopener noreferrer">Подробнее<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></a></aside><div class="sale-hotline"><span>Горячая линия</span><a href="tel:88007779710">8 (800) 777-97-10</a><small>Звонок бесплатный</small></div>`;
 }
 const recentCardAdds = new Set();
 const shoeSizeCharts = {
@@ -407,7 +409,7 @@ function sizeLabel(product, size) {
 const addedCheck = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8" /></svg>';
 function productCard(product, compact = false) {
   const sizes = product.sizes.map((size) => { const key = `${product.id}:${size}`; const added = recentCardAdds.has(key); return `<button type="button" class="card-size-button ${added ? "is-added" : ""}" data-card-product="${product.id}" data-card-size="${escapeHtml(String(size))}" aria-label="${added ? "Добавлено в корзину" : `Добавить размер ${escapeHtml(String(size))}${sizeCentimeters(product, size) ? `, ${sizeCentimeters(product, size)} см` : ""} в корзину`}" ${added ? "disabled" : ""}>${added ? addedCheck : sizeLabel(product, size)}</button>`; }).join("");
-  return `<article class="product-card ${compact ? "compact" : ""}"><button class="product-open" data-product="${product.id}" aria-label="Открыть ${escapeHtml(product.name)}"><span class="card-image"><img src="${product.image}" alt="${escapeHtml(product.name)}" loading="lazy" /></span><span class="card-info"><strong title="${escapeHtml(product.name)}">${escapeHtml(product.name)}</strong><small>Арт. ${product.article}</small></span></button><div class="card-buy"><span class="card-sizes"><em>Размеры</em><span class="card-size-list">${sizes}</span></span><span class="card-price"><b>${currentProductPrice(product)}</b></span>${priceDiscountNote()}${sizeStockNote(product, selectedCardSizes.get(product.id))}</div></article>`;
+  return `<article class="product-card ${compact ? "compact" : ""}"><button class="product-open" data-product="${product.id}" aria-label="Открыть ${escapeHtml(product.name)}"><span class="card-image"><img src="${product.image}" alt="${escapeHtml(product.name)}" loading="lazy" /></span><span class="card-info"><strong title="${escapeHtml(product.name)}">${escapeHtml(product.name)}</strong></span></button><div class="card-buy"><span class="card-price" aria-label="Цена с учётом скидки ${discountInfo().discount}%"><b>${currentProductPrice(product)}</b></span><small class="card-article">арт. ${escapeHtml(product.article)}</small><span class="card-sizes"><span class="card-size-list" role="group" aria-label="Размеры — нажмите, чтобы добавить в корзину">${sizes}</span></span>${sizeStockNote(product, selectedCardSizes.get(product.id))}</div></article>`;
 }
 
 function catalogView() {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-14T09:36:49.693Z",
+  "generatedAt": "2026-10-15T03:36:52.0955958Z",
   "title": "Design System: ХАСЛ",
   "extensions": {
     "colorMeta": {
@@ -31,8 +31,8 @@
     },
     "typographyMeta": {
       "display": {
-        "displayName": "Баннер",
-        "purpose": "Крупный заголовок баннера; на телефоне clamp(27px, 7.5vw, 36px)."
+        "displayName": "Заголовочная полоса",
+        "purpose": "Заголовок баннера: clamp(30px,3.8vw,52px); mobile clamp(22px,6vw,38px)."
       },
       "headline": {
         "displayName": "Заголовки страниц",
@@ -57,6 +57,11 @@
         "name": "shadow-float",
         "value": "0 16px 40px rgba(17, 17, 17, .14)",
         "purpose": "Существующий повторяемый токен всплывающих слоёв, в том числе уведомления; не общий стиль карточек."
+      },
+      {
+        "purpose": "Лёгкая тень фиксированной нижней навигации.",
+        "value": "0 -4px 20px #0000000a",
+        "name": "mobile-bottom-nav"
       }
     ],
     "motion": [
@@ -79,6 +84,21 @@
         "name": "reduced-motion",
         "value": "prefers-reduced-motion: reduce",
         "purpose": "Отключает анимации, переходы и плавную прокрутку."
+      },
+      {
+        "purpose": "Появление информационного баннера.",
+        "value": "cubic-bezier(.22, 1, .36, 1)",
+        "name": "ease-editorial"
+      },
+      {
+        "purpose": "Короткое появление из translateY(18px), opacity .55; только при no-preference.",
+        "value": "450ms",
+        "name": "sheet-arrive"
+      },
+      {
+        "purpose": "Задержка второй части баннера.",
+        "value": "80ms",
+        "name": "sheet-stagger"
       }
     ],
     "breakpoints": [
@@ -89,26 +109,32 @@
       {
         "name": "mobile-max",
         "value": "767px"
+      },
+      {
+        "name": "tablet-max",
+        "value": "1023px"
       }
-    ]
+    ],
+    "layout": {
+      "conditionColumns": {
+        "mobile": 1,
+        "tablet": 2,
+        "desktop": 3
+      },
+      "categoryColumns": {
+        "desktop": 3,
+        "mobile": 1
+      },
+      "mobileGutter": "16px",
+      "desktopGutter": "28px",
+      "shellMaxWidth": "1360px",
+      "campaignColumns": {
+        "desktop": "1.65fr 1fr",
+        "mobile": "1fr"
+      }
+    }
   },
   "components": [
-    {
-      "name": "Основное действие",
-      "kind": "button",
-      "refersTo": "button-primary",
-      "description": "Лаймовая кнопка товара или оформления.",
-      "html": "<button class=\"ds-primary\" type=\"button\">Добавить в корзину</button>",
-      "css": ".ds-primary{font-family:var(--font-text,Montserrat,Arial,sans-serif);min-height:48px;padding:0 22px;border:0;border-radius:0;background:var(--brand,#ccff02);color:var(--foreground,#111);font-size:16px;font-weight:700;cursor:pointer;box-shadow:none;transition:transform 160ms var(--spring-press,cubic-bezier(.22,1,.36,1));}.ds-primary:active{transform:scale(.98)}.ds-primary:disabled{opacity:.65;cursor:not-allowed}@media(hover:hover) and (pointer:fine){.ds-primary:hover{background:var(--foreground,#111);color:var(--brand,#ccff02)}}.ds-primary:focus-visible{outline:3px solid var(--foreground,#111);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}"
-    },
-    {
-      "name": "Вторичная ссылка",
-      "kind": "button",
-      "refersTo": "button-secondary",
-      "description": "Ссылка информационного блока на условия скидки.",
-      "html": "<a class=\"ds-secondary\" href=\"#terms\">Подробнее</a>",
-      "css": ".ds-secondary{font-family:var(--font-text,Montserrat,Arial,sans-serif);display:inline-flex;align-items:center;min-height:44px;padding:0 12px 0 14px;border:0;border-radius:0;background:var(--foreground,#111);color:var(--background,#fff);font-size:14px;font-weight:700;text-decoration:none;box-shadow:none;transition:background-color 160ms ease,color 160ms ease,transform 140ms var(--spring-press,cubic-bezier(.22,1,.36,1))}.ds-secondary:active{transform:scale(.96)}@media(hover:hover) and (pointer:fine){.ds-secondary:hover{background:var(--brand,#ccff02);color:var(--foreground,#111)}}.ds-secondary:focus-visible{outline:3px solid var(--foreground,#111);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}"
-    },
     {
       "name": "Поле оформления",
       "kind": "input",
@@ -116,14 +142,6 @@
       "description": "Светлое текстовое поле с чёрной рамкой при фокусе.",
       "html": "<label class=\"ds-field\">Имя<input class=\"ds-input\" autocomplete=\"given-name\" placeholder=\"Ваше имя\"></label>",
       "css": ".ds-field{font-family:var(--font-text,Montserrat,Arial,sans-serif);display:grid;gap:8px;color:#333;font-size:14px}.ds-input{font-family:var(--font-text,Montserrat,Arial,sans-serif);height:56px;padding:0 16px;border:1px solid transparent;border-radius:0;background:var(--surface,#f3f3f3);color:var(--foreground,#111);font-size:16px;caret-color:var(--foreground,#111);box-shadow:none}.ds-input::placeholder{color:#696969}.ds-input:focus{border-color:var(--foreground,#111)}.ds-input:focus-visible{outline:3px solid var(--foreground,#111);outline-offset:3px;}"
-    },
-    {
-      "name": "Десктопная навигация",
-      "kind": "nav",
-      "refersTo": "navigation",
-      "description": "Существующая горизонтальная навигация; выбранный пункт лаймовый.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Основная навигация\"><a class=\"ds-nav-item ds-nav-current\" href=\"#home\" aria-current=\"page\">Главная</a><a class=\"ds-nav-item\" href=\"#catalog\">Каталог</a></nav>",
-      "css": ".ds-nav{display:flex;align-items:center;gap:3px;background:var(--background,#fff)}.ds-nav-item{font-family:var(--font-text,Montserrat,Arial,sans-serif);display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:6px 11px;border:0;border-radius:0;background:transparent;color:var(--foreground,#111);font-size:14px;font-weight:650;line-height:1;text-decoration:none;box-shadow:none;transition:color 160ms ease,background-color 160ms ease,transform 140ms var(--spring-press,cubic-bezier(.22,1,.36,1))}.ds-nav-current{background:var(--brand,#ccff02)}.ds-nav-item:active{transform:scale(.97)}@media(hover:hover) and (pointer:fine){.ds-nav-item:hover{background:#f7f7f7;color:#222}.ds-nav-current:hover{background:var(--brand,#ccff02);color:var(--foreground,#111)}}.ds-nav-item:focus-visible{outline:3px solid var(--foreground,#111);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-nav-item{transition:none}}"
     },
     {
       "name": "Чип фильтра",
@@ -134,30 +152,32 @@
       "css": ".ds-chips{display:flex;gap:6px;flex-wrap:wrap}.ds-chip{font-family:var(--font-text,Montserrat,Arial,sans-serif);min-height:44px;padding:8px 16px;border:0;border-radius:0;background:var(--surface,#f3f3f3);color:var(--foreground,#111);font-size:14px;font-weight:700;cursor:pointer;box-shadow:none;transition:transform 140ms cubic-bezier(.23,1,.32,1)}.ds-chip-selected{background:var(--brand,#ccff02)}.ds-chip:active{transform:scale(.97)}.ds-chip:focus-visible{outline:3px solid var(--foreground,#111);outline-offset:3px;}@media(max-width:767px){.ds-chip{padding:8px 11px;font-size:13px}}@media(prefers-reduced-motion:reduce){.ds-chip{transition:none}}"
     },
     {
-      "name": "Сводка заказа",
-      "kind": "card",
-      "refersTo": "summary-card",
-      "description": "Плоский светлый контейнер итогов; тире в образце обозначают данные приложения.",
-      "html": "<section class=\"ds-summary\" aria-label=\"Сводка заказа\"><div class=\"ds-summary-row\"><span>Товары</span><b>—</b></div><div class=\"ds-summary-row\"><span>Скидка</span><b>—</b></div><hr class=\"ds-summary-line\"><div class=\"ds-summary-row ds-summary-total\"><span>Итого</span><b>—</b></div></section>",
-      "css": ".ds-summary{font-family:var(--font-text,Montserrat,Arial,sans-serif);height:max-content;padding:18px 16px;border:0;border-radius:0;background:var(--surface,#f3f3f3);color:var(--foreground,#111);box-shadow:none}.ds-summary-row{display:flex;align-items:center;justify-content:space-between;min-height:28px;gap:12px;color:var(--muted,#595959);font-size:14px}.ds-summary-row b{font-weight:500}.ds-summary-line{height:1px;margin:4px 0 12px;border:0;background:var(--line,#d6d6d6)}.ds-summary-total{color:var(--foreground,#111)}"
+      "name": "CTA главной",
+      "html": "<button class=\"ds-cta\" type=\"button\">Выбрать вещи <span aria-hidden=\"true\">↗</span></button>",
+      "css": ".ds-cta{display:inline-flex;align-items:center;gap:44px;min-height:58px;padding:16px 24px;border:0;border-radius:0;background:var(--brand,#ccff02);color:var(--foreground,#111);font:700 15px Montserrat,Arial,sans-serif;cursor:pointer;transition:transform 160ms cubic-bezier(.22,1,.36,1),background-color 160ms,color 160ms}.ds-cta:hover{background:var(--foreground,#111);color:var(--brand,#ccff02)}.ds-cta:active{transform:scale(.98)}.ds-cta:focus-visible{outline:3px solid #111;outline-offset:4px}@media(max-width:767px){.ds-cta{width:100%;min-height:52px;justify-content:space-between}}@media(prefers-reduced-motion:reduce){.ds-cta{transition:none}}",
+      "kind": "button",
+      "refersTo": "hero-cta",
+      "description": "Лаймовый переход к вещам, на телефоне занимает всю ширину."
     },
     {
-      "name": "Шкала скидки",
-      "kind": "custom",
-      "refersTo": "discount-meter",
-      "description": "Образец визуальных состояний; длину заполнения, отметки и значения вычисляет существующее приложение.",
-      "html": "<section class=\"ds-meter\" aria-label=\"Шкала скидки: образец состояний\"><div class=\"ds-meter-track\"><span class=\"ds-meter-fill\"></span><b class=\"ds-meter-point ds-meter-reached\"></b><b class=\"ds-meter-point\"></b></div><div class=\"ds-meter-labels\"><span class=\"ds-meter-achieved\">Достигнуто</span><span>Следующая ступень</span></div></section>",
-      "css": ".ds-meter{font-family:var(--font-text,Montserrat,Arial,sans-serif);padding:9px 14px 7px;border-radius:0;background:var(--foreground,#111);color:var(--background,#fff);box-shadow:none}.ds-meter-track{position:relative;display:flex;align-items:center;justify-content:space-between;height:14px;margin:0 4px}.ds-meter-track:before{position:absolute;content:\"\";left:0;right:0;top:50%;height:4px;background:#626262;transform:translateY(-50%)}.ds-meter-fill{position:absolute;left:0;top:50%;width:100%;height:4px;background:var(--brand,#ccff02);transform:translateY(-50%) scaleX(.5);transform-origin:left center}.ds-meter-point{position:relative;width:14px;height:14px;border:2px solid #777;border-radius:0;background:#777;color:var(--foreground,#111)}.ds-meter-reached{border-color:var(--brand,#ccff02);background:var(--brand,#ccff02)}.ds-meter-labels{display:flex;justify-content:space-between;margin-top:3px;font-size:13px}.ds-meter-achieved{color:var(--brand,#ccff02)}"
+      "name": "Сводка заказа",
+      "html": "<section class=\"ds-summary\" aria-label=\"Сводка заказа\"><span>Итого</span><strong>—</strong></section>",
+      "css": ".ds-summary{display:flex;justify-content:space-between;gap:16px;padding:24px;border:0;border-radius:0;background:var(--surface,#f3f3f3);color:var(--foreground,#111);font:14px Montserrat,Arial,sans-serif;box-shadow:none}@media(max-width:767px){.ds-summary{padding:20px}}",
+      "kind": "card",
+      "refersTo": "summary-card",
+      "description": "Плоская светлая панель; реальные суммы задаёт приложение."
     }
   ],
   "narrative": {
-    "northStar": "Айдентика ХАСЛ",
-    "overview": "Белая витрина с чёрной типографикой и лаймовыми действиями. Прямые углы и сочетание Montserrat с Unbounded воспроизводят заданную пользователем айдентику.\n\nДокумент фиксирует итоговый каскад: `styles.css`, затем `ui-refinement.css`, затем `hasl-theme.css`. Токены описывают повторяемые решения; исходная структура страниц и механика магазина остаются контрактом существующего приложения.",
+    "northStar": "Информационный баннер акции",
+    "overview": "Чёрно-лаймовый информационный баннер акции без товарной подборки. Шкала ниже сохранена. В меню добавлены аксессуары. Прямые углы, Montserrat и Unbounded.",
     "keyCharacteristics": [
-      "Прямые углы у контейнеров, контролов и псевдоэлементов.",
-      "Лайм выделяет действие, выбор и достигнутую скидку.",
-      "Montserrat обслуживает интерфейс; Unbounded — крупные заголовки.",
-      "Промофото монохромные; товарные фотографии сохраняют исходные цвета."
+      "Шесть реальных товаров открывают существующие карточки.",
+      "Оболочка 1360px, боковые отступы 28px / 16px.",
+      "Три категории на десктопе, горизонтальные строки на телефоне.",
+      "Плоские поверхности, прямые углы и лаймовое выбранное состояние.",
+      "Короткий вход со stagger 55ms; reduced motion отключает движение.",
+      "Изображения повторно используются из проекта; новые фотографии и утверждения о лицензиях не добавлены."
     ],
     "rules": [
       {
@@ -183,10 +203,10 @@
       "Do сохранять исходные цвета товарных фотографий и существующее поведение магазина."
     ],
     "donts": [
-      "Don't возвращать скругления в контейнеры, контролы или псевдоэлементы.",
-      "Don't заменять Montserrat и Unbounded другими шрифтами.",
-      "Don't превращать унаследованные одноразовые эффекты в новые правила системы.",
-      "Don't менять товарные данные, пороги скидок или размещение элементов в рамках ребрендинга."
+      "Don't возвращать скругления или заменять Montserrat и Unbounded.",
+      "Don't восстанавливать перекрытие баннера шкалой как обязательный контракт.",
+      "Don't менять цены, остатки, пороги скидок или торговую механику ради оформления.",
+      "Don't приписывать существующим фото неподтверждённую лицензию."
     ]
   }
 }
