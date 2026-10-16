@@ -28,7 +28,7 @@ jobs:
       - name: Prepare public files
         run: |
           mkdir -p _site
-          cp index.html app.js styles.css ui-refinement.css hasl-theme.css product-*.js russian-cities.js city-suggestions.js _site/
+          cp index.html app.js styles.css ui-refinement.css hasl-theme.css product-*.js product-search.css product-gallery.css russian-cities.js city-suggestions.js _site/
           cp -r images assets _site/
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
